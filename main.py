@@ -16,6 +16,32 @@ import sklearn
 
 sentence_delimeter = u"@s"
 
+def clean_tags(corpus):
+    tags = []
+    tags_index = []
+    open_tag = -1
+    close_tag = -1
+
+    for i in range(0, len(corpus)):
+        if corpus[i] == "<":
+            open_tag = i
+
+        if corpus[i] == ">":
+            close_tag = i + 1
+
+        if open_tag > -1 and close_tag > -1:
+            tags_index.append((open_tag, close_tag))
+            open_tag = -1
+            close_tag = -1
+
+    for index in tags_index:
+        tags.append(corpus[index[0]:index[1]])
+
+    for tag in tags:
+        corpus = corpus.replace(tag, "")
+
+    return corpus
+
 def tokenizer(corpus):
     sentences = nltk.sent_tokenize(corpus)
     sentence_iter = []
@@ -257,6 +283,7 @@ def normalize_corpus(corpus):
     normalized_corpus = []
 
     # corpus = corpus_case(corpus)
+    corpus = clean_tags(corpus)
     corpus = corpus.lower()
     corpus = expand_contractions(corpus)
     tokens, sentence_n = tokenizer(corpus)
@@ -277,7 +304,7 @@ documentString = u"Let's have some fun! You should personally try it. " \
                  u"Daren't do it around 9 o'clock. " \
                  u"Dog is the man's bestfriend. Ain't me."
 
-sample = u"<p>The food is great but the service is not good.</p>"
+sample = u"<p class='alert alert-info'>The food is <span> great </span> but the service is not good.</p>"
 
 book_review = u"I'm going to keep this brief since there isn't much to say that hasn't already been said. *clears throat* " \
               u"I think the reason I waited so long to read this series is because I just couldn't imagine myself enjoying " \
@@ -296,5 +323,5 @@ book_review = u"I'm going to keep this brief since there isn't much to say that 
 
 
 
-normalize_corpus(book_review)
+normalize_corpus(sample)
 
