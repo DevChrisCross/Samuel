@@ -10,6 +10,7 @@ import numpy
 import scipy
 import pandas
 import sklearn
+from Normalize import Normalize
 
 # nlp = spacy.load("en")
 # vectorCount = nlp(documentString)
@@ -324,4 +325,11 @@ book_review = u"I'm going to keep this brief since there isn't much to say that 
 
 
 normalize_corpus(sample)
+
+normalize = Normalize(sample)
+corpus, tokens, sentence_n = normalize.get_normalized_corpus()
+print(corpus)
+print(tokens)
+print(sentence_n)
+
 
