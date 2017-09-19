@@ -9,11 +9,10 @@ class Normalize(object):
     sentence_delimeter = u"@s"
 
     def __init__(self, corpus):
-        self.corpus = corpus
+        self.corpus = ""
         self.sentence_n = []
         self.tokens = []
-        self.normalize_corpus(self.corpus)
-
+        self.normalize_corpus(corpus)
 
     def get_normalized_corpus(self):
         return self.corpus, self.tokens, self.sentence_n
@@ -31,6 +30,7 @@ class Normalize(object):
         tokens = self.remove_stopwords(tokens)
         tokens = self.remove_special_characters(tokens)
         tokens = self.lemmatize(tokens)
+        tokens = self.finalize(tokens)
         self.tokens = tokens
 
     def clean_tags(self, corpus):
@@ -290,3 +290,12 @@ class Normalize(object):
             lemmatized_tokens.append(lemmatized_token)
 
         return lemmatized_tokens
+
+    def finalize(self, tokens):
+        filtered_tokens = []
+
+        for token in tokens:
+            if len(token) != 1:
+                filtered_tokens.append(token)
+
+        return filtered_tokens

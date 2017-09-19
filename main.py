@@ -324,7 +324,7 @@ book_review = u"I'm going to keep this brief since there isn't much to say that 
 
 
 
-normalize_corpus(sample)
+normalize_corpus(documentString)
 
 normalize = Normalize(sample)
 corpus, tokens, sentence_n = normalize.get_normalized_corpus()
