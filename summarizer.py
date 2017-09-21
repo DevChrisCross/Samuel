@@ -132,7 +132,6 @@ def continuous_lexrank(sent_array, sent_limit, cos_threshold = 0.1):
 
     # initiate lexrank score for each sentence
     sent_length = len(sent_array)
-    lexrank_score = numpy.zeros(shape=(sent_length))
     lexrank_score = [compute_lexrank(cosine_matrix, nodeU) for nodeU in range(sent_length)]
     # lexrank_score = sorted(iterable=lexrank_score, reverse=True)
     return lexrank_score

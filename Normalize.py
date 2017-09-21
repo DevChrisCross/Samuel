@@ -4,10 +4,7 @@ import string
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 
-
 class Normalize(object):
-    sentence_delimeter = u"@s"
-
     def __init__(self, corpus):
         self.corpus = ""
         self.sentence_n = []
@@ -87,10 +84,7 @@ class Normalize(object):
         filtered_tokens = []
 
         for token in tokens:
-            if sentdelim_regex_compiled.match(string=token) is None and token[:4] != "NOT_":
-                token = sc_regex_compiled.sub(string=token, repl="")
-            if token == "":
-                continue
+            token = sc_regex_compiled.sub(string=token, repl="")
             filtered_tokens.append(token)
 
         return filtered_tokens
