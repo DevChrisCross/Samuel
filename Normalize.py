@@ -14,7 +14,7 @@ class Normalize(object):
     def get_normalized_corpus(self):
         return self.corpus, self.tokens, self.sentence_n
 
-    def normalize_corpus(self, corpus):
+    def normalize_corpus(self, corpus, negate = False, ):
         corpus = self.clean_tags(corpus)
         corpus = corpus.lower()
         corpus = self.expand_contractions(corpus)
@@ -26,6 +26,7 @@ class Normalize(object):
         tokens = self.negate_tokens(tokens)
         tokens = self.remove_stopwords(tokens)
         tokens = self.remove_special_characters(tokens)
+
         tokens = self.lemmatize(tokens)
         tokens = self.finalize(tokens)
         self.tokens = tokens
@@ -56,7 +57,7 @@ class Normalize(object):
 
         return corpus
 
-    def tokenizer(self, corpus):
+    def tokenizer(self, corpus, tokenize_sent = False):
         sentences = nltk.sent_tokenize(corpus)
         sentence_iter = []
         sentence_start = 0
@@ -79,14 +80,14 @@ class Normalize(object):
     def remove_special_characters(self, tokens):
         sc_regex_string = "[{}]".format(re.escape(string.punctuation))
         sc_regex_compiled = re.compile(pattern=sc_regex_string)
-        sentdelim_regex_string = r"@s\d*"
-        sentdelim_regex_compiled = re.compile(pattern=sentdelim_regex_string)
         filtered_tokens = []
 
         for token in tokens:
-            token = sc_regex_compiled.sub(string=token, repl="")
+            if token[:4] != "NOT_":
+                token = sc_regex_compiled.sub(string=token, repl="")
             filtered_tokens.append(token)
 
+        filtered_tokens = list(filter(lambda token: token != "", filtered_tokens))
         return filtered_tokens
 
     def expand_contractions(self, corpus):
@@ -243,12 +244,10 @@ class Normalize(object):
                                'shouldn',
                                'wasn',
                                'wouldn']
-        index = 0
 
-        for token in tokens:
+        for index, token in enumerate(tokens):
             if token in negative_stop_words:
                 tokens[index + 1] = "NOT_" + tokens[index + 1]
-            index = index + 1
 
         return tokens
 
@@ -293,3 +292,4 @@ class Normalize(object):
                 filtered_tokens.append(token)
 
         return filtered_tokens
+

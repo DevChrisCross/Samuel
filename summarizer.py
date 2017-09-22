@@ -68,7 +68,7 @@ def document_frequency(sent_array, dictionary, smoothing = True):
     return doc_frequency, inv_frequency
 
 def idf_modified_cosine(sentX_index, sentY_index, tf_matrix, idf):
-    numerator = denominator = 0
+    numerator = 0
     summation_X = summation_Y = 0
     dictionary = tf_matrix[sentX_index]
 
@@ -106,7 +106,6 @@ def init_cosine_matrix(sent_array, cos_threshold, tf_matrix, idf):
 
 def compute_lexrank(cosine_matrix, nodeU, damping_factor = 0.85):
     sent_length = len(cosine_matrix)
-    lexrank_value = 0
     summation_adjnodeU = 0
 
     # compute the needed summation of vertices adjacent to the node U
