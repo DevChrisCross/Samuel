@@ -5,6 +5,11 @@ import string
 from pprint import pprint
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
+from nltk import word_tokenize, pos_tag
+from collections import Counter
+from io import StringIO
+import warnings
+warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 import gensim
 import numpy
 import scipy
@@ -54,7 +59,6 @@ def remove_special_characters(tokens):
         filtered_tokens.append(token)
 
     return filtered_tokens
-
 
 def expand_contractions(corpus):
     contraction_map = {
@@ -191,7 +195,6 @@ def expand_contractions(corpus):
     expanded_corpus = contraction_regex_compiled.sub(string=corpus, repl=expand_corpus)
     return expanded_corpus
 
-
 def remove_stopwords(tokens):
     stopwords_en = nltk.corpus.stopwords.words('english')
     filtered_tokens = []
@@ -206,7 +209,6 @@ def lemmatize(tokens):
     wordnet_lemmatizer = WordNetLemmatizer()
     annotated_tokens = nltk.pos_tag(tokens, tagset="universal")
     lemmatized_tokens = []
-
     token_ctr = 0
     for token in tokens:
         pos_tag = annotated_tokens[token_ctr][1]
@@ -225,6 +227,27 @@ def lemmatize(tokens):
 
     return lemmatized_tokens
 
+def get_nouns(corpus):
+    nouns = [token for token, pos in pos_tag(word_tokenize(corpus)) if pos.startswith('N')]
+    return nouns
+
+def get_aspect(nouns):
+    counts = Counter(nouns)
+    return counts.most_common(1)
+
+def get_classifier(aspect):
+    search_item = StringIO()
+    search_item.write(aspect)
+    search_item.write('.n.01')
+    definition = wordnet.synset(search_item.getvalue()).definition()
+    definition_nouns = get_nouns(definition)
+    definition_nouns.append(aspect)
+    return definition_nouns
+
+def intersect_lists(from_aspect, from_corpus):
+    intersection = [itm for itm in from_aspect if itm in from_corpus]
+    return intersection
+
 def normalize_corpus(corpus):
     normalized_corpus = []
 
@@ -235,18 +258,28 @@ def normalize_corpus(corpus):
     tokens = remove_stopwords(tokens)
     tokens = remove_special_characters(tokens)
     tokens = lemmatize(tokens)
+    nouns = get_nouns(corpus)
+    aspect = get_aspect(nouns)
+    classifier = get_classifier(aspect[0][0])
+    classifier = intersect_lists(classifier, nouns)
+
 
     print(corpus)
     print(tokens)
+    print(classifier)
     print(sentence_n)
     # print(nltk.corpus.stopwords.words('english'))
     return normalized_corpus
 
 
-documentString = u"Let's have some fun! You should personally try it. " \
-                 u"'Twas night before christmas. " \
-                 u"Daren't do it around 9 o'clock. " \
-                 u"Dog is the man's bestfriend. Ain't me."
+# documentString = u"Let's have some fun! You should personally try it. " \
+#                  u"'Twas night before christmas. " \
+#                  u"Daren't do it around 9 o'clock. " \
+#                  u"Dog is the man's bestfriend. Ain't me."
+
+documentString = u"Extraordinary hotel. " \
+                 u"This hotel has good services, bad dogs, super qualified staffs. " \
+                 u"hotel hotel hotel."
 
 
 
