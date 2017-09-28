@@ -1,5 +1,5 @@
 import nltk
-import spacy
+# import spacy
 import re
 import string
 from pprint import pprint
@@ -9,18 +9,20 @@ from nltk import word_tokenize, pos_tag
 from collections import Counter
 from io import StringIO
 import warnings
+
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 import gensim
 import numpy
 import scipy
 import pandas
 import sklearn
-from Normalize import Normalize
+import Normalize
 
 # nlp = spacy.load("en")
 # vectorCount = nlp(documentString)
 
 sentence_delimeter = u"@s"
+
 
 def tokenizer(corpus):
     sentences = nltk.sent_tokenize(corpus)
@@ -45,6 +47,7 @@ def tokenizer(corpus):
 
     return words, sentence_iter
 
+
 def remove_special_characters(tokens):
     sc_regex_string = "[{}]".format(re.escape(string.punctuation))
     sc_regex_compiled = re.compile(pattern=sc_regex_string)
@@ -60,6 +63,7 @@ def remove_special_characters(tokens):
         filtered_tokens.append(token)
 
     return filtered_tokens
+
 
 def expand_contractions(corpus):
     contraction_map = {
@@ -196,6 +200,7 @@ def expand_contractions(corpus):
     expanded_corpus = contraction_regex_compiled.sub(string=corpus, repl=expand_corpus)
     return expanded_corpus
 
+
 def clean_tags(corpus):
     tags = []
     tags_index = []
@@ -222,6 +227,7 @@ def clean_tags(corpus):
 
     return corpus
 
+
 def negate_tokens(tokens):
     negative_stop_words = ['no',
                            'not',
@@ -245,10 +251,11 @@ def negate_tokens(tokens):
 
     for token in tokens:
         if token in negative_stop_words:
-            tokens[index+1] = "NOT_"+tokens[index+1]
-        index = index+1
+            tokens[index + 1] = "NOT_" + tokens[index + 1]
+        index = index + 1
 
     return tokens
+
 
 def remove_stopwords(tokens):
     stopwords_en = nltk.corpus.stopwords.words('english')
@@ -259,6 +266,7 @@ def remove_stopwords(tokens):
             filtered_tokens.append(token)
 
     return filtered_tokens
+
 
 def lemmatize(tokens):
     wordnet_lemmatizer = WordNetLemmatizer()
@@ -282,13 +290,16 @@ def lemmatize(tokens):
 
     return lemmatized_tokens
 
+
 def get_nouns(corpus):
     nouns = [token for token, pos in pos_tag(word_tokenize(corpus)) if pos.startswith('N')]
     return nouns
 
+
 def get_aspect(nouns):
     counts = Counter(nouns)
     return counts.most_common(1)
+
 
 def get_classifier(aspect):
     search_item = StringIO()
@@ -299,9 +310,11 @@ def get_classifier(aspect):
     definition_nouns.append(aspect)
     return definition_nouns
 
+
 def intersect_lists(from_aspect, from_corpus):
     intersection = [itm for itm in from_aspect if itm in from_corpus]
     return intersection
+
 
 def normalize_corpus(corpus):
     normalized_corpus = []
@@ -319,7 +332,6 @@ def normalize_corpus(corpus):
     aspect = get_aspect(nouns)
     classifier = get_classifier(aspect[0][0])
     classifier = intersect_lists(classifier, nouns)
-
 
     print(corpus)
     print(tokens)
@@ -355,12 +367,10 @@ book_review = u"I'm going to keep this brief since there isn't much to say that 
               u"a hero. Harry is kind to those that deserve it, fearless when it counts the most, and wonderfully intelligent." \
               u"What's not to love? "
 
-
-
 normalize_corpus(documentString)
 
-normalize = Normalize(sample)
-corpus, tokens, sentence_n = normalize.get_normalized_corpus()
+corpus, tokens, sentence_n = Normalize.normalize_corpus(sample)
 print(corpus)
 print(tokens)
 print(sentence_n)
+
