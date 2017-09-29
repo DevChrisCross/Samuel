@@ -8,15 +8,22 @@ import warnings
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
-def normalize_corpus(corpus):
-    corpus = __clean_tags(corpus)
-    corpus = corpus.lower()
-    corpus = __expand_contractions(corpus)
-    tokens, sentence_n = __tokenizer(corpus)
-    tokens = __negate_tokens(tokens)
-    tokens = __remove_stopwords(tokens)
-    tokens = __remove_special_characters(tokens)
-    tokens = __lemmatize(tokens)
+def normalize_corpus(input_corpus):
+    corpus = []
+    tokens = []
+    sentence_n = []
+    for cor in input_corpus:
+        cor = __clean_tags(cor)
+        cor = cor.lower()
+        cor = __expand_contractions(cor)
+        tok, sen_n = __tokenizer(cor)
+        tok = __negate_tokens(tok)
+        tok = __remove_stopwords(tok)
+        tok = __remove_special_characters(tok)
+        tok = __lemmatize(tok)
+        corpus.append(cor)
+        tokens.append(tok)
+        sentence_n.append(sen_n)
 
     return corpus, tokens, sentence_n
 
