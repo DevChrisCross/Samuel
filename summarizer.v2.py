@@ -1,5 +1,4 @@
 import re
-import math
 import numpy
 import string
 import nltk
@@ -106,10 +105,8 @@ def term_frequency(sentences, n_gram=1):
         the features of the sentences, and the dictionary built for the feature extraction
     """
 
-    word_vector = dict()
-    word_dictionary = set()
-
     # initialize word_dictionary set
+    word_dictionary = set()
     for sentence in sentences:
         for i in range(len(sentence) - n_gram + 1):
             word = ""
@@ -119,13 +116,8 @@ def term_frequency(sentences, n_gram=1):
                     word += " "
             word_dictionary.add(word)
 
-    # initialize word_vector with empty frequencies
-    for i in range(len(sentences)):
-        word_vector[i] = dict()
-        for word in word_dictionary:
-            word_vector[i][word] = 0
-
     # count the frequency with the corresponding n-gram model
+    word_vector = {i: {word: 0 for word in word_dictionary} for i in range(len(sentences))}
     for i in range(len(sentences)):
         for j in range(len(sentences[i]) - n_gram + 1):
             word = ""
@@ -149,22 +141,14 @@ def inverse_document_frequency(tf, dictionary):
     :return: array. the inverse document frequency of each word in the dictionary
     """
 
-    doc_frequency = dict()
-    inv_frequency = dict()
-
-    for word in dictionary:
-        doc_frequency[word] = 0.0
-        inv_frequency[word] = 0.0
-
+    total_docs = len(tf)
+    doc_frequency = {word: 0.0 for word in dictionary}
     for row in tf:
         for word in tf[row]:
             if tf[row][word] != 0:
                 doc_frequency[word] += 1
 
-    total_docs = len(tf)
-    for word in dictionary:
-        inv_frequency[word] = numpy.log(float(total_docs) / doc_frequency[word])
-
+    inv_frequency = {word: numpy.log(float(total_docs) / doc_frequency[word]) for word in dictionary}
     return inv_frequency
 
 
@@ -192,21 +176,17 @@ def build_cosine_matrix(sent_length, tf, idf):
         dictionary = tf[x]
 
         for word in dictionary:
-            numerator += tf[x][word] * tf[y][word] * (idf[word])**2
-            summation_x += (tf[x][word] * idf[word])**2
-            summation_y += (tf[y][word] * idf[word])**2
+            numerator += tf[x][word] * tf[y][word] * numpy.square(idf[word])
+            summation_x += numpy.square(tf[x][word] * idf[word])
+            summation_y += numpy.square(tf[y][word] * idf[word])
 
-        denominator = math.sqrt(summation_x) * math.sqrt(summation_y)
+        denominator = numpy.sqrt(summation_x) * numpy.sqrt(summation_y)
         idf_cosine = numerator / denominator
         idf_cosine = float("{0:.3f}".format(idf_cosine))
 
         return idf_cosine
 
-    cosine_matrix = numpy.zeros(shape=(sent_length, sent_length))
-    for i in range(sent_length):
-        for j in range(sent_length):
-            cosine_matrix[i][j] = idf_modified_cosine(i, j, tf, idf)
-
+    cosine_matrix = [[idf_modified_cosine(i, j, tf, idf) for j in range(sent_length)] for i in range(sent_length)]
     return cosine_matrix
 
 
@@ -241,9 +221,7 @@ def lexrank(cosine_matrix, threshold, damping_factor = 0.85):
         for i in range(lexrank_length):
             summation_j = 0
             for j in range(lexrank_length):
-                summation_k = 0
-                for k in range(lexrank_length):
-                    summation_k += cosine_matrix[j][k]
+                summation_k = sum(cosine_matrix[j])
                 summation_j += old_lexrank[j] * (cosine_matrix[i][j] / summation_k)
             new_lexrank[i] = (damping_factor / lexrank_length) + ((1 - damping_factor) * (summation_j))
 
@@ -328,7 +306,7 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, lambda_value=
     return mmr_scores
 
 
-def initialize_lexrank(corpus, summary_length, threshold = 0.1, mmr=False, query=None, orderby_score=False, split_sent=False, correct_sent=False, tokenize_sent=True):
+def initialize_lexrank(corpus, summary_length, threshold=0.1, mmr=False, query=None, orderby_score=False, split_sent=False, correct_sent=False, tokenize_sent=True):
     """Summarizes a document using the the Lexical PageRank Algorithm
 
     :param corpus: the document to be summarized
@@ -371,6 +349,70 @@ def initialize_lexrank(corpus, summary_length, threshold = 0.1, mmr=False, query
     }
 
 
+def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):
+
+    def word_similarity(words1, words2):
+        words1 = [letter.lower() for letter in words1 if letter != " "]
+        words2 = [letter.lower() for letter in words2 if letter != " "]
+
+        words = words1 + words2
+        character_vector = {i: {letter.lower(): 0 for letter in words} for i in range(2)}
+        for index, word in enumerate([words1, words2]):
+            for letter in word:
+                character_vector[index][letter] += 1
+
+        c_vector = [[character_vector[i][letter] for letter in character_vector[i]] for i in range(2)]
+        similarity_n = numpy.dot(c_vector[0], c_vector[1])
+        similarity_d = numpy.sqrt(sum(numpy.square(c_vector[0]))) * numpy.sqrt(sum(numpy.square(c_vector[1])))
+        similarity_score = similarity_n / similarity_d
+
+        return similarity_score
+
+    sentences = normalize_text(text, tokenize_sent, correct_sent)
+    tf = term_frequency(sentences["normalized"], n_gram)
+    word_dict = {word: 0 for word in tf["word_dictionary"]}
+    for sentence in tf["word_vector"]:
+        for word in tf["word_vector"][sentence]:
+            word_dict[word] += tf["word_vector"][sentence][word]
+    collocations = sorted(word_dict.items(), key=lambda word: word[1], reverse=True)
+    collocations = collocations[:keywords]
+
+    raw_sentences = nltk.sent_tokenize(text)
+    tokenized_sentences = [nltk.word_tokenize(sentence) for sentence in raw_sentences]
+    tagged_sentences = nltk.pos_tag_sents(tokenized_sentences)
+    chunked_sentences = list(nltk.ne_chunk_sents(tagged_sentences))
+
+    sc_regex_string = "[{}]".format(re.escape(string.punctuation))
+    sc_regex_compiled = re.compile(pattern=sc_regex_string)
+    word = 0; tag = 1
+    formed_noun = ""
+
+    phrase_tag_list = ["DT", "JJ", "NN", "NNS", "NNP", "NNPS"]
+    noun_phrases = list()
+    for i in range(len(chunked_sentences)):
+        # phrases = list()
+        for j in range(len(chunked_sentences[i])):
+            chunked_word = chunked_sentences[i][j]
+            if hasattr(chunked_word, "label"):
+                formed_noun += (" " if formed_noun else "") + (" ".join([child[0] for child in chunked_word]))
+            else:
+                is_special_character = sc_regex_compiled.sub(string=chunked_word[word], repl="") == ""
+                if not is_special_character or chunked_word[word] == "." or chunked_word[word] == ",":
+                    if chunked_word[tag] in phrase_tag_list:
+                        formed_noun += (" " if formed_noun else "") + chunked_word[word]
+                    else:
+                        if formed_noun:
+                            noun_phrases.append(formed_noun)
+                            formed_noun = ""
+
+    formed_keyphrases = dict()
+    for keyphrase in collocations:
+        top_phrases = {phrase: word_similarity(keyphrase[0], phrase) for phrase in noun_phrases}
+        top_phrases = sorted(top_phrases.items(), key=lambda word: word[1], reverse=True)
+        formed_keyphrases[keyphrase] = top_phrases[0]
+
+    return formed_keyphrases
+
 document1 = [
     '''iraqi vice president taha yassin ramadan announced today, sunday, that iraq refuses to back down from its decision to stop cooperating with disarmament inspectors before its demands are met.''',
     '''iraqi vice president taha yassin ramadan announced today, thursday, that iraq rejects cooperating with the united nations except on the issue of lifting the blockade imposed upon it since the year 1990.''',
@@ -393,7 +435,7 @@ The game is set two hundred years after the events of Oblivion and takes place i
 The player completes quests and develops the character by improving skills.
 Skyrim continues the open world tradition of its predecessors by allowing the player to travel anywhere in the game world at any time, and to ignore or postpone the main storyline indefinitely.
 The player may freely roam over the land of Skyrim, which is an open world environment consisting of wilderness expanses, dungeons, cities, towns, fortresses and villages.
-Players may navigate the game world more quickly by riding horses, or by utilizing a fast-travel system which allows them to warp to previously Players have the option to develop their character.
+Players may navigate the game world more quickly by riding horses, or by utilizing a fast-travel system which allows them to warp to previously, and players have the option to develop their character.
 At the beginning of the game, players create their character by selecting one of several races, including humans, orcs, elves and anthropomorphic cat or lizard-like creatures, and then customizing their character's appearance, discovered locations.
 Over the course of the game, players improve their character's skills, which are numerical representations of their ability in certain areas.
 There are eighteen skills divided evenly among the three schools of combat, magic, and stealth.
@@ -401,8 +443,19 @@ Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's 
 Like other creatures, Dragons are generated randomly in the world and will engage in combat.
 """
 
-pprint(initialize_lexrank(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
-pprint(initialize_lexrank(document1, summary_length=3, mmr=True, query="War against Iraq", tokenize_sent=False))
+# pprint(initialize_lexrank(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
+# pprint(initialize_lexrank(document1, summary_length=3, mmr=True, query="War against Iraq", tokenize_sent=False))
+
+
+print(extract_keyphrase(document2))
+# sp = list(shallow_parse(document2))
+# for i in range(len(sp)):
+#     for j in range(len(sp[i])):
+#         print(sp[i][j])
+        # variables = [i for i in dir(word) if not callable(i)]
+        # print(variables.count(), variables.index())
+        # if hasattr(word, "label"):
+        #     print(word, " ", word.label())
 
 from gensim.summarization import summarize
 # print(summarize("""The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
