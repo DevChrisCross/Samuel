@@ -6,6 +6,8 @@ import enchant
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 from pprint import pprint
+import warnings
+warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
 def normalize_text(text, tokenize_sentence=True, correct_spelling=False):
@@ -223,7 +225,7 @@ def lexrank(cosine_matrix, threshold, damping_factor = 0.85):
             for j in range(lexrank_length):
                 summation_k = sum(cosine_matrix[j])
                 summation_j += old_lexrank[j] * (cosine_matrix[i][j] / summation_k)
-            new_lexrank[i] = (damping_factor / lexrank_length) + ((1 - damping_factor) * (summation_j))
+            new_lexrank[i] = (damping_factor / lexrank_length) + ((1 - damping_factor) * summation_j)
 
         return new_lexrank
 
@@ -306,8 +308,66 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, lambda_value=
     return mmr_scores
 
 
+def divrank(cosine_matrix, threshold=0.1, lambda_value=0.7, alpha_value=0.5, cos_threshold = 0.1):
+
+    def organic_value(x, y, cosine_matrix):
+        return (1 - alpha_value) if x == y else (alpha_value*cosine_matrix[x][y])
+
+    def generate_divrank(old_divrank, cosine_matrix):
+        divrank_length = len(old_divrank)
+        new_divrank = numpy.zeros(shape=divrank_length)
+        visited_n = numpy.zeros(shape=divrank_length)
+        visited_n.fill(1)
+
+        for i in range(divrank_length):
+            summation_j = 0
+            for j in range(divrank_length):
+                summation_k = 0
+                for k in range(divrank_length):
+                    summation_k += (organic_value(j, k, cosine_matrix) * old_divrank[k])
+                summation_j += (old_divrank[j] * ((organic_value(j, i, cosine_matrix) * visited_n[i]) / summation_k))
+                if organic_value(j, i, cosine_matrix):
+                    visited_n[i] += 1
+            new_divrank[i] = ((1 - lambda_value) * (1/divrank_length)) + (lambda_value * summation_j)
+
+        return new_divrank
+
+    divrank_length = len(cosine_matrix)
+    node_degree = numpy.zeros(shape=divrank_length)
+    for i in range(divrank_length):
+        for j in range(divrank_length):
+            if cosine_matrix[i][j] > cos_threshold:
+                cosine_matrix[i][j] = 1
+                node_degree[i] += 1
+            else:
+                cosine_matrix[i][j] = 0
+    cosine_matrix = [[cosine_matrix[i][j]/node_degree[i] for j in range(divrank_length)] for i in range(divrank_length)]
+
+    initial_divrank = numpy.zeros(shape=divrank_length)
+    initial_divrank.fill(1 / divrank_length)
+    new_divrank = generate_divrank(initial_divrank, cosine_matrix)
+    lexrank_vector = new_divrank - initial_divrank
+    delta_value = numpy.linalg.norm(lexrank_vector)
+
+    while delta_value > threshold:
+        old_divrank = new_divrank
+        new_divrank = generate_divrank(old_divrank, cosine_matrix)
+        lexrank_vector = new_divrank - old_divrank
+        delta_value = numpy.linalg.norm(lexrank_vector)
+
+    divrank_scores = [{
+        "score": float("{0:.3f}".format(new_divrank[i] / max(new_divrank))),
+        "index": i
+    } for i in range(len(new_divrank))]
+    divrank_scores = sorted(divrank_scores, key=lambda sentence: sentence["score"], reverse=True)
+
+    return divrank_scores
+
+
 def initialize_lexrank(corpus, summary_length, threshold=0.1, mmr=False, query=None, orderby_score=False, split_sent=False, correct_sent=False, tokenize_sent=True):
     """Summarizes a document using the the Lexical PageRank Algorithm
+
+        The documentation and option for using the DivRank Algorithm is not yet set.
 
     :param corpus: the document to be summarized
     :param summary_length: the number of sentences needed in the summary
@@ -331,13 +391,14 @@ def initialize_lexrank(corpus, summary_length, threshold=0.1, mmr=False, query=N
     cosine_matrix = build_cosine_matrix(len(sentences["normalized"]), tf["word_vector"], idf)
 
     lexrank_scores = lexrank(cosine_matrix, threshold)
+    lexrank_scores = divrank(cosine_matrix, threshold)
     sentence_scores = maximal_marginal_relevance(sentences["normalized"], lexrank_scores, query) if mmr and query else lexrank_scores
     summary_scores = sentence_scores[:summary_length]
     summary_scores = summary_scores if orderby_score else sorted(summary_scores, key=lambda sentence: sentence["index"])
 
     summary_text = list() if split_sent else ""
     for sentence in summary_scores:
-        sentence["text"] = sentences["raw"][sentence["index"]].capitalize()
+        sentence["text"] = sentences["raw"][sentence["index"]].capitalize().replace('\n', "")
         if split_sent:
             summary_text.append(sentence["text"])
         else:
@@ -350,8 +411,24 @@ def initialize_lexrank(corpus, summary_length, threshold=0.1, mmr=False, query=N
 
 
 def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):
+    """
+
+    :param text:
+    :param n_gram:
+    :param keywords:
+    :param correct_sent:
+    :param tokenize_sent:
+    :return:
+    """
 
     def word_similarity(words1, words2):
+        """
+
+        :param words1:
+        :param words2:
+        :return:
+        """
+
         words1 = [letter.lower() for letter in words1 if letter != " "]
         words2 = [letter.lower() for letter in words2 if letter != " "]
 
@@ -443,19 +520,10 @@ Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's 
 Like other creatures, Dragons are generated randomly in the world and will engage in combat.
 """
 
-# pprint(initialize_lexrank(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
-# pprint(initialize_lexrank(document1, summary_length=3, mmr=True, query="War against Iraq", tokenize_sent=False))
+pprint(initialize_lexrank(document2, summary_length=3, mmr=False, query="Elder Scrolls Online", orderby_score=False))
+pprint(initialize_lexrank(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, orderby_score=False))
+# pprint(extract_keyphrase(document2))
 
-
-print(extract_keyphrase(document2))
-# sp = list(shallow_parse(document2))
-# for i in range(len(sp)):
-#     for j in range(len(sp[i])):
-#         print(sp[i][j])
-        # variables = [i for i in dir(word) if not callable(i)]
-        # print(variables.count(), variables.index())
-        # if hasattr(word, "label"):
-        #     print(word, " ", word.label())
 
 from gensim.summarization import summarize
 # print(summarize("""The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
