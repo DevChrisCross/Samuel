@@ -472,26 +472,16 @@ def summarize(corpus, summary_length, threshold=0.1, drank=False, mmr=False, que
         # "norm_text": sentences["normalized"][i]
     } for i in range(len(sentences["raw"]))]
 
-    if drank:
-        divrank(summary_scores, cosine_matrix, threshold)
-        scorebase = "divrank_score"
-    else:
-        lexrank(summary_scores, cosine_matrix, threshold)
-        scorebase = "lexrank_score"
-    if mmr and query:
-        maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase=scorebase)
+    scorebase = "divrank_score" if drank else "lexrank_score"
+    summary_scores = divrank(summary_scores, cosine_matrix, threshold) if drank else lexrank(summary_scores, cosine_matrix, threshold)
+    summary_scores = maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase=scorebase) if mmr else summary_scores
 
     sort_criteria = (("mmr_score" if mmr else "divrank_score") if drank else ("mmr_score" if mmr else "lexrank_score"))
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
     summary_scores = summary_scores[:summary_length]
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria if sort_score else "index"], reverse=sort_score)
-
-    summary_text = list() if split_sent else ""
-    for sentence in summary_scores:
-        if split_sent:
-            summary_text.append(sentence["raw_text"])
-        else:
-            summary_text += (sentence["raw_text"] + " ")
+    summary_text = [sentence["raw_text"] for sentence in summary_scores]
+    summary_text = (" ").join(summary_text) if not split_sent else summary_text
 
     return {
         "text": summary_text,
