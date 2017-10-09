@@ -192,7 +192,7 @@ def build_cosine_matrix(sent_length, tf, idf):
     return cosine_matrix
 
 
-def lexrank(cosine_matrix, threshold, damping_factor = 0.85):
+def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
     """Computes the Lexrank for the corresponding given cosine matrix. A ranking algorithm which involves
        computing sentence importance based on the concept of eigenvector centrality in a graph representation of sentences.
 
@@ -241,74 +241,13 @@ def lexrank(cosine_matrix, threshold, damping_factor = 0.85):
         lexrank_vector = new_lexrank - old_lexrank
         delta_value = numpy.linalg.norm(lexrank_vector)
 
-    lexrank_scores = [{
-        "score": float("{0:.3f}".format(new_lexrank[i] / max(new_lexrank))),
-        "index": i
-    } for i in range(len(new_lexrank))]
-    lexrank_scores = sorted(lexrank_scores, key=lambda sentence: sentence["score"], reverse=True)
+    for i in range(len(sentences)):
+        sentences[i]["lexrank_score"] = float("{0:.3f}".format(new_lexrank[i] / max(new_lexrank)))
 
-    return lexrank_scores
+    return sentences
 
 
-def maximal_marginal_relevance(sentences, ranked_sentences, query, lambda_value=0.7):
-    """A diversity based ranking technique used to maximize the relevance and novelty in finally retrieved top-ranked items.
-
-    The Use of MMR, Diversity-Based Reranking for Reordering Documents and Producing Summaries
-        Jaime Carbonell jgc@cs.cmu.edu
-        Jade Goldstein  jade@cs.cmu.edu
-        Language Technologies Institute, Carnegie Mellon University
-    You can check the algorithm at http://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf
-
-    :param sentences: the normalized sentences
-    :param ranked_sentences: array. {score, index} a dictionary of ranked list performed by an IR system.
-    :param query: string. a text where mmr would be referenced to
-    :param lambda_value: a decimal value ranging [0, 1]
-        Users wishing to sample the information space around the query, should set this at a smaller value, and
-        those wishing to focus in on multiple potentially overlapping or reinforcing relevant documents,
-        should set this to a larger value
-    :return: {mmr} the ranked sentences with an additional mmr key attribute
-    """
-
-    def compute_mmr(x, mmr_scores, cosine_matrix):
-        """Computes the mmr of a sentence in respect to the existing subset mmr_scores
-
-        :param x: the index of the sentences with the maximum score
-        :param mmr_scores: the subset containg the processed sentences
-        :param cosine_matrix: the idf modified cosine similarity matrix
-        :return: the maximal marginal relevance value of the sentence
-        """
-
-        similarity_scores = [cosine_matrix[x][sentence["index"]] for sentence in mmr_scores]
-        maximum_similarity = max(similarity_scores) if similarity_scores else 0
-        mmr = lambda_value * (cosine_matrix[x][-1] - (1 - lambda_value) * maximum_similarity)
-
-        return mmr
-
-    query = normalize_text(query)
-    sentences.append(query["normalized"][0])
-    tf = term_frequency(sentences)
-    idf = inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
-    cosine_matrix = build_cosine_matrix(len(sentences), tf["word_vector"], idf)
-
-    mmr_scores = list()
-    while ranked_sentences:
-        sentence = max(ranked_sentences, key=lambda sentence: sentence["score"])
-        sentence["mmr"] = compute_mmr(sentence["index"], mmr_scores, cosine_matrix)
-        mmr_scores.append(sentence)
-        ranked_sentences.remove(sentence)
-
-    min_sent = min(mmr_scores, key=lambda sentence: sentence["mmr"])
-    max_sent = max(mmr_scores, key=lambda sentence: sentence["mmr"])
-    min_mmr = min_sent["mmr"]
-    max_mmr = max_sent["mmr"]
-    for sentence in mmr_scores:
-        sentence["mmr"] = float("{0:.3f}".format((sentence["mmr"] - min_mmr) / (max_mmr - min_mmr)))
-    mmr_scores = sorted(mmr_scores, key=lambda sentence: sentence["mmr"], reverse=True)
-
-    return mmr_scores
-
-
-def divrank(cosine_matrix, threshold=0.1, damping_factor=0.9, alpha_value=0.25, beta_value=0.3, cos_threshold = 0.1):
+def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value=0.25, beta_value=0.3, cos_threshold = 0.1):
 
     def organic_value(x, y, cosine_matrix):
         return (1 - alpha_value) if x == y else (alpha_value*cosine_matrix[x][y])
@@ -356,59 +295,68 @@ def divrank(cosine_matrix, threshold=0.1, damping_factor=0.9, alpha_value=0.25, 
         lexrank_vector = new_divrank - old_divrank
         delta_value = numpy.linalg.norm(lexrank_vector)
 
-    divrank_scores = [{
-        "score": float("{0:.3f}".format(new_divrank[i] / max(new_divrank))),
-        "index": i
-    } for i in range(len(new_divrank))]
-    divrank_scores = sorted(divrank_scores, key=lambda sentence: sentence["score"], reverse=True)
+    for i in range(len(sentences)):
+        sentences[i]["divrank_score"] = float("{0:.3f}".format(new_divrank[i] / max(new_divrank)))
 
-    return divrank_scores
+    return sentences
 
 
-def initialize_lexrank(corpus, summary_length, threshold=0.1, mmr=False, query=None, orderby_score=False, split_sent=False, correct_sent=False, tokenize_sent=True):
-    """Summarizes a document using the the Lexical PageRank Algorithm
+def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, lambda_value=0.7):
+    """A diversity based ranking technique used to maximize the relevance and novelty in finally retrieved top-ranked items.
 
-        The documentation and option for using the DivRank Algorithm is not yet set.
+    The Use of MMR, Diversity-Based Reranking for Reordering Documents and Producing Summaries
+        Jaime Carbonell jgc@cs.cmu.edu
+        Jade Goldstein  jade@cs.cmu.edu
+        Language Technologies Institute, Carnegie Mellon University
+    You can check the algorithm at http://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf
 
-    :param corpus: the document to be summarized
-    :param summary_length: the number of sentences needed in the summary
-    :param threshold: the threshold value of the LexRank Algorithm
-    :param mmr: boolean. enables the Maximal Marginal Relevance Algorithm
-    :param query: string. the query needed to enable mmr
-    :param orderby_score: boolean. if the sentences should be sorted by appearance or score
-    :param split_sent: boolean. if the output should be an array of sentences or an entire string
-    :param correct_sent: boolean. if the text normalization module should perform a word correcting
-    :param tokenize_sent: boolean. if the text input should be tokenize into sentences
-        It should be set to false if the text input is an array of sentences
-    :return: {text, score} a dictionary that returns the text summary, and the corresponding scores of the sentences
+    :param sentences: the normalized sentences
+    :param ranked_sentences: array. {score, index} a dictionary of ranked list performed by an IR system.
+    :param query: string. a text where mmr would be referenced to
+    :param lambda_value: a decimal value ranging [0, 1]
+        Users wishing to sample the information space around the query, should set this at a smaller value, and
+        those wishing to focus in on multiple potentially overlapping or reinforcing relevant documents,
+        should set this to a larger value
+    :return: {mmr} the ranked sentences with an additional mmr key attribute
     """
 
-    if mmr and not query:
-        raise ValueError("You need to provide a query to enable mmr.")
+    def compute_mmr(x, mmr_scores, cosine_matrix):
+        """Computes the mmr of a sentence in respect to the existing subset mmr_scores
 
-    sentences = normalize_text(corpus, tokenize_sent, correct_sent)
-    tf = term_frequency(sentences["normalized"])
+        :param x: the index of the sentences with the maximum score
+        :param mmr_scores: the subset containg the processed sentences
+        :param cosine_matrix: the idf modified cosine similarity matrix
+        :return: the maximal marginal relevance value of the sentence
+        """
+
+        similarity_scores = [cosine_matrix[x][sentence["index"]] for sentence in mmr_scores]
+        maximum_similarity = max(similarity_scores) if similarity_scores else 0
+        mmr = lambda_value * (cosine_matrix[x][-1] - (1 - lambda_value) * maximum_similarity)
+
+        return mmr
+
+    query = normalize_text(query)
+    sentences.append(query["normalized"][0])
+    tf = term_frequency(sentences)
     idf = inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
-    cosine_matrix = build_cosine_matrix(len(sentences["normalized"]), tf["word_vector"], idf)
+    cosine_matrix = build_cosine_matrix(len(sentences), tf["word_vector"], idf)
 
-    lexrank_scores = lexrank(cosine_matrix, threshold)
-    lexrank_scores = divrank(cosine_matrix, threshold)
-    sentence_scores = maximal_marginal_relevance(sentences["normalized"], lexrank_scores, query) if mmr and query else lexrank_scores
-    summary_scores = sentence_scores[:summary_length]
-    summary_scores = summary_scores if orderby_score else sorted(summary_scores, key=lambda sentence: sentence["index"])
+    mmr_scores = list()
+    while ranked_sentences:
+        sentence = max(ranked_sentences, key=lambda sentence: sentence[scorebase])
+        sentence["mmr_score"] = compute_mmr(sentence["index"], mmr_scores, cosine_matrix)
+        mmr_scores.append(sentence)
+        ranked_sentences.remove(sentence)
 
-    summary_text = list() if split_sent else ""
-    for sentence in summary_scores:
-        sentence["text"] = sentences["raw"][sentence["index"]].capitalize().replace('\n', "")
-        if split_sent:
-            summary_text.append(sentence["text"])
-        else:
-            summary_text += sentence["text"] + " "
+    min_sent = min(mmr_scores, key=lambda sentence: sentence["mmr_score"])
+    max_sent = max(mmr_scores, key=lambda sentence: sentence["mmr_score"])
+    min_mmr = min_sent["mmr_score"]
+    max_mmr = max_sent["mmr_score"]
+    for sentence in mmr_scores:
+        sentence["mmr_score"] = float("{0:.3f}".format((sentence["mmr_score"] - min_mmr) / (max_mmr - min_mmr)))
+        ranked_sentences.append(sentence)
 
-    return {
-        "text": summary_text,
-        "score": summary_scores
-    }
+    return ranked_sentences
 
 
 def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):
@@ -491,6 +439,66 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
 
     return formed_keyphrases
 
+
+def summarize(corpus, summary_length, threshold=0.1, drank=False, mmr=False, query=None, sort_score=False, split_sent=False, correct_sent=False, tokenize_sent=True):
+    """Summarizes a document using the the Lexical PageRank Algorithm
+
+        The documentation and option for using the DivRank Algorithm is not yet set.
+
+    :param corpus: the document to be summarized
+    :param summary_length: the number of sentences needed in the summary
+    :param threshold: the threshold value of the LexRank Algorithm
+    :param mmr: boolean. enables the Maximal Marginal Relevance Algorithm
+    :param query: string. the query needed to enable mmr
+    :param sort_score: boolean. if the sentences should be sorted by appearance or score
+    :param split_sent: boolean. if the output should be an array of sentences or an entire string
+    :param correct_sent: boolean. if the text normalization module should perform a word correcting
+    :param tokenize_sent: boolean. if the text input should be tokenize into sentences
+        It should be set to false if the text input is an array of sentences
+    :return: {text, score} a dictionary that returns the text summary, and the corresponding scores of the sentences
+    """
+
+    if mmr and not query:
+        raise ValueError("You need to provide a query to enable mmr.")
+
+    sentences = normalize_text(corpus, tokenize_sent, correct_sent)
+    tf = term_frequency(sentences["normalized"])
+    idf = inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
+    cosine_matrix = build_cosine_matrix(len(sentences["normalized"]), tf["word_vector"], idf)
+
+    summary_scores = [{
+        "index": i,
+        "raw_text": sentences["raw"][i].capitalize().replace('\n',""),
+        # "norm_text": sentences["normalized"][i]
+    } for i in range(len(sentences["raw"]))]
+
+    if drank:
+        divrank(summary_scores, cosine_matrix, threshold)
+        scorebase = "divrank_score"
+    else:
+        lexrank(summary_scores, cosine_matrix, threshold)
+        scorebase = "lexrank_score"
+    if mmr and query:
+        maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase=scorebase)
+
+    sort_criteria = (("mmr_score" if mmr else "divrank_score") if drank else ("mmr_score" if mmr else "lexrank_score"))
+    summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
+    summary_scores = summary_scores[:summary_length]
+    summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria if sort_score else "index"], reverse=sort_score)
+
+    summary_text = list() if split_sent else ""
+    for sentence in summary_scores:
+        if split_sent:
+            summary_text.append(sentence["raw_text"])
+        else:
+            summary_text += (sentence["raw_text"] + " ")
+
+    return {
+        "text": summary_text,
+        "score": summary_scores
+    }
+
+
 document1 = [
     '''iraqi vice president taha yassin ramadan announced today, sunday, that iraq refuses to back down from its decision to stop cooperating with disarmament inspectors before its demands are met.''',
     '''iraqi vice president taha yassin ramadan announced today, thursday, that iraq rejects cooperating with the united nations except on the issue of lifting the blockade imposed upon it since the year 1990.''',
@@ -522,8 +530,8 @@ Like other creatures, Dragons are generated randomly in the world and will engag
 The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
 """
 
-pprint(initialize_lexrank(document2, summary_length=3, mmr=False, query="Elder Scrolls Online"))
-pprint(initialize_lexrank(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, orderby_score=True))
+pprint(summarize(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
+pprint(summarize(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, sort_score=True))
 # pprint(extract_keyphrase(document2))
 
 
