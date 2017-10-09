@@ -308,7 +308,7 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, lambda_value=
     return mmr_scores
 
 
-def divrank(cosine_matrix, threshold=0.1, lambda_value=0.7, alpha_value=0.5, cos_threshold = 0.1):
+def divrank(cosine_matrix, threshold=0.1, damping_factor=0.9, alpha_value=0.25, beta_value=0.3, cos_threshold = 0.1):
 
     def organic_value(x, y, cosine_matrix):
         return (1 - alpha_value) if x == y else (alpha_value*cosine_matrix[x][y])
@@ -324,12 +324,13 @@ def divrank(cosine_matrix, threshold=0.1, lambda_value=0.7, alpha_value=0.5, cos
             for j in range(divrank_length):
                 summation_k = 0
                 for k in range(divrank_length):
-                    summation_k += (organic_value(j, k, cosine_matrix) * old_divrank[k])
+                    summation_k += (organic_value(j, k, cosine_matrix) * old_divrank[k] * visited_n[k])
+                    if organic_value(j, k, cosine_matrix):
+                        visited_n[k] += 1
                 summation_j += (old_divrank[j] * ((organic_value(j, i, cosine_matrix) * visited_n[i]) / summation_k))
                 if organic_value(j, i, cosine_matrix):
                     visited_n[i] += 1
-            new_divrank[i] = ((1 - lambda_value) * (1/divrank_length)) + (lambda_value * summation_j)
-
+            new_divrank[i] = ((1 - damping_factor) * numpy.power(i + 1, beta_value * -1)) + (damping_factor * summation_j)
         return new_divrank
 
     divrank_length = len(cosine_matrix)
@@ -518,10 +519,11 @@ Over the course of the game, players improve their character's skills, which are
 There are eighteen skills divided evenly among the three schools of combat, magic, and stealth.
 Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's wilderness.
 Like other creatures, Dragons are generated randomly in the world and will engage in combat.
+The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
 """
 
-pprint(initialize_lexrank(document2, summary_length=3, mmr=False, query="Elder Scrolls Online", orderby_score=False))
-pprint(initialize_lexrank(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, orderby_score=False))
+pprint(initialize_lexrank(document2, summary_length=3, mmr=False, query="Elder Scrolls Online"))
+pprint(initialize_lexrank(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, orderby_score=True))
 # pprint(extract_keyphrase(document2))
 
 
