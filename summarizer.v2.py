@@ -203,10 +203,11 @@ def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
         University of Michigan, Ann Arbor, MI 48109 USA
     You can check the algorithm at https://www.cs.cmu.edu/afs/cs/project/jair/pub/volume22/erkan04a-html/erkan04a.html
 
+    :param sentences: the array in which the lexrank score of each sentence will be stored
     :param cosine_matrix: the cosine matrix to be ranked by Lexical PageRank
     :param threshold: a decimal value ranging [0, 1]. the threshold value for the algorithm
     :param damping_factor: a decimal value ranging [0, 1] the convergence value for the algorithm
-    :return: (score, index) a tuple list of the lexrank score and its index in the cosine matrix
+    :return: array of sentences and their corresponding lexrank score
     """
 
     def generate_lexrank(old_lexrank, cosine_matrix):
@@ -247,7 +248,27 @@ def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
     return sentences
 
 
-def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value=0.25, beta_value=0.3, cos_threshold = 0.1):
+def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value=0.25, beta_value=0.3, cos_threshold=0.1):
+    """Computes the divrank for the corresponding given cosine matrix.
+        A novel ranking algorithm based on a reinforced random walk in an information network.
+
+    DivRank: the Interplay of Prestige and Diversity in Information Networks
+        Qiaozhu Mei     qmei@umich.edu
+        Jian Guo        guojian@umich.edu
+        Dragomir Radev  radev@umich.edu
+        School of Information, Department of EECS, Department of Statistics
+        University of Michigan, Ann Arbor, MI 48109 USA
+    You can check the algorithm at https://pdfs.semanticscholar.org/0ba4/ab185a116f11286460463357720853fa81a7.pdf
+
+    :param sentences: the normalized array of sentences
+    :param cosine_matrix: the cosine matrix to be ranked by Diverse Rank
+    :param threshold: a decimal value ranging [0, 1]. the threshold value for the algorithm
+    :param damping_factor: a decimal value ranging [0, 1] the convergence value for the algorithm
+    :param alpha_value: a decimal value ranging [0, 1] the value from which the organic transition probability is produced
+    :param beta_value: a decimal value ranging [0, 1] the value from which the prior transition probability is produced
+    :param cos_threshold: the cosine threshold in which the cosine matrix becomes a binary cosine matrix
+    :return: the sentences with their corresponding divrank scores
+    """
 
     def organic_value(x, y, cosine_matrix):
         return (1 - alpha_value) if x == y else (alpha_value*cosine_matrix[x][y])
@@ -313,6 +334,7 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, la
     :param sentences: the normalized sentences
     :param ranked_sentences: array. {score, index} a dictionary of ranked list performed by an IR system.
     :param query: string. a text where mmr would be referenced to
+    :param scorebase: string. determines what scoring system shall be used for mmr
     :param lambda_value: a decimal value ranging [0, 1]
         Users wishing to sample the information space around the query, should set this at a smaller value, and
         those wishing to focus in on multiple potentially overlapping or reinforcing relevant documents,
@@ -360,24 +382,17 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, la
 
 
 def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):
-    """
+    """Extracts significant keywords or keyphrases that represents the idea of the entire text
 
-    :param text:
-    :param n_gram:
-    :param keywords:
-    :param correct_sent:
-    :param tokenize_sent:
-    :return:
+    :param text: string. the text to bextracted the info from
+    :param n_gram: the gram model to be used for collocations
+    :param keywords: the top number of keywords to return
+    :param correct_sent: parameters for the normalize module
+    :param tokenize_sent: parameters for the normalize module
+    :return: an array of keyphrases
     """
 
     def word_similarity(words1, words2):
-        """
-
-        :param words1:
-        :param words2:
-        :return:
-        """
-
         words1 = [letter.lower() for letter in words1 if letter != " "]
         words2 = [letter.lower() for letter in words2 if letter != " "]
 
@@ -403,7 +418,7 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
     collocations = sorted(word_dict.items(), key=lambda word: word[1], reverse=True)
     collocations = collocations[:keywords]
 
-    raw_sentences = nltk.sent_tokenize(text)
+    raw_sentences = nltk.sent_tokenize(text) if tokenize_sent else text
     tokenized_sentences = [nltk.word_tokenize(sentence) for sentence in raw_sentences]
     tagged_sentences = nltk.pos_tag_sents(tokenized_sentences)
     chunked_sentences = list(nltk.ne_chunk_sents(tagged_sentences))
@@ -461,6 +476,7 @@ def summarize(corpus, summary_length, threshold=0.1, drank=False, mmr=False, que
     if mmr and not query:
         raise ValueError("You need to provide a query to enable mmr.")
 
+    keywords = extract_keyphrase(corpus, correct_sent=correct_sent, tokenize_sent=tokenize_sent)
     sentences = normalize_text(corpus, tokenize_sent, correct_sent)
     tf = term_frequency(sentences["normalized"])
     idf = inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
@@ -469,7 +485,7 @@ def summarize(corpus, summary_length, threshold=0.1, drank=False, mmr=False, que
     summary_scores = [{
         "index": i,
         "raw_text": sentences["raw"][i].capitalize().replace('\n',""),
-        # "norm_text": sentences["normalized"][i]
+        "norm_text": ",".join(sentences["normalized"][i])
     } for i in range(len(sentences["raw"]))]
 
     scorebase = "divrank_score" if drank else "lexrank_score"
@@ -485,7 +501,8 @@ def summarize(corpus, summary_length, threshold=0.1, drank=False, mmr=False, que
 
     return {
         "text": summary_text,
-        "score": summary_scores
+        "score": summary_scores,
+        "keywords": keywords
     }
 
 
