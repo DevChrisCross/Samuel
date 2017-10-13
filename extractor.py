@@ -66,3 +66,4 @@ training_set = nltk.classify.apply_features(extract_features, corpus)
 classifier = nltk.NaiveBayesClassifier.train(training_set)
 # print("accuracy: ", nltk.classify.accuracy(classifier, testing_se) * 100)
 print(classifier.classify(extract_features(['worst','sentence'])))
+# author check
