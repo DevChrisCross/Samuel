@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, abort, request
 from flask_cors import CORS
-import Normalize
+from api import Samuel
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -11,11 +11,11 @@ def get_tasks():
     return "Welcome"
 
 
-@app.route('/sample_input', methods=['POST'])
+@app.route('/samuel_api', methods=['POST'])
 def sample_input():
     data = request.get_json()
-    corpus, tokens, sentence_n = Normalize.normalize_corpus(data['corpus'])
-    return jsonify({'corpus': corpus, 'tokens': tokens, "sentence_n": sentence_n})
+    summarized_corpus = Samuel.process(data['corpus'], data['summary_length'])
+    return jsonify({'summarized_corpus': summarized_corpus})
 
 
 @app.route('/data_entry', methods=['POST'])
