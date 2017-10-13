@@ -225,7 +225,7 @@ def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
             summation_j = 0
             for j in range(lexrank_length):
                 summation_k = sum(cosine_matrix[j])
-                summation_j += old_lexrank[j] * (cosine_matrix[i][j] / summation_k)
+                summation_j += (old_lexrank[j] * cosine_matrix[i][j]) / summation_k
             new_lexrank[i] = (damping_factor / lexrank_length) + ((1 - damping_factor) * summation_j)
 
         return new_lexrank
@@ -248,7 +248,8 @@ def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
     return sentences
 
 
-def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value=0.25, beta_value=0.3, cos_threshold=0.1):
+def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0.25, beta_value=None,
+            cos_threshold=0.1):
     """Computes the divrank for the corresponding given cosine matrix.
         A novel ranking algorithm based on a reinforced random walk in an information network.
 
@@ -263,7 +264,7 @@ def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value
     :param sentences: the normalized array of sentences
     :param cosine_matrix: the cosine matrix to be ranked by Diverse Rank
     :param threshold: a decimal value ranging [0, 1]. the threshold value for the algorithm
-    :param damping_factor: a decimal value ranging [0, 1] the convergence value for the algorithm
+    :param lambda_value: a decimal value ranging [0, 1] the convergence value for the algorithm
     :param alpha_value: a decimal value ranging [0, 1] the value from which the organic transition probability is produced
     :param beta_value: a decimal value ranging [0, 1] the value from which the prior transition probability is produced
     :param cos_threshold: the cosine threshold in which the cosine matrix becomes a binary cosine matrix
@@ -273,7 +274,7 @@ def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value
     def organic_value(x, y, cosine_matrix):
         return (1 - alpha_value) if x == y else (alpha_value*cosine_matrix[x][y])
 
-    def generate_divrank(old_divrank, cosine_matrix):
+    def generate_divrank(old_divrank, cosine_matrix, beta_value):
         divrank_length = len(old_divrank)
         new_divrank = numpy.zeros(shape=divrank_length)
         visited_n = numpy.zeros(shape=divrank_length)
@@ -290,29 +291,31 @@ def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value
                 summation_j += (old_divrank[j] * ((organic_value(j, i, cosine_matrix) * visited_n[i]) / summation_k))
                 if organic_value(j, i, cosine_matrix):
                     visited_n[i] += 1
-            new_divrank[i] = ((1 - damping_factor) * numpy.power(i + 1, beta_value * -1)) + (damping_factor * summation_j)
+            prior_distribution = numpy.power(i + 1, beta_value * -1) if beta_value else (1/divrank_length)
+            new_divrank[i] = ((1 - lambda_value) * prior_distribution) + (lambda_value * summation_j)
         return new_divrank
 
-    divrank_length = len(cosine_matrix)
-    node_degree = numpy.zeros(shape=divrank_length)
-    for i in range(divrank_length):
-        for j in range(divrank_length):
+    matrix_length = len(cosine_matrix)
+    node_degree = numpy.zeros(shape=matrix_length)
+    for i in range(matrix_length):
+        for j in range(matrix_length):
             if cosine_matrix[i][j] > cos_threshold:
                 cosine_matrix[i][j] = 1
                 node_degree[i] += 1
             else:
                 cosine_matrix[i][j] = 0
-    cosine_matrix = [[cosine_matrix[i][j]/node_degree[i] for j in range(divrank_length)] for i in range(divrank_length)]
+    cosine_matrix = [[cosine_matrix[i][j]/node_degree[i] for j in range(matrix_length)] for i in
+                     range(matrix_length)]
 
-    initial_divrank = numpy.zeros(shape=divrank_length)
-    initial_divrank.fill(1 / divrank_length)
-    new_divrank = generate_divrank(initial_divrank, cosine_matrix)
+    initial_divrank = numpy.zeros(shape=matrix_length)
+    initial_divrank.fill(1 / matrix_length)
+    new_divrank = generate_divrank(initial_divrank, cosine_matrix, beta_value)
     lexrank_vector = new_divrank - initial_divrank
     delta_value = numpy.linalg.norm(lexrank_vector)
 
     while delta_value > threshold:
         old_divrank = new_divrank
-        new_divrank = generate_divrank(old_divrank, cosine_matrix)
+        new_divrank = generate_divrank(old_divrank, cosine_matrix, beta_value)
         lexrank_vector = new_divrank - old_divrank
         delta_value = numpy.linalg.norm(lexrank_vector)
 
@@ -379,6 +382,59 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, la
         ranked_sentences.append(sentence)
 
     return ranked_sentences
+
+
+def grasshopper(sentences, ranked_sentences, cosine_matrix, scorebase, lambda_value=0.5, cos_threshold=0.1):
+
+    def power_method(matrix, distribution=None):
+        if not distribution:
+            distribution = numpy.zeros(shape=len(matrix))
+            distribution.fill(1/len(matrix))
+        new_distribution = numpy.zeros(shape=len(distribution))
+        for i in range(len(distribution)):
+            for j in range(len(distribution)):
+                new_distribution[i] += (matrix[i][j] * distribution[j])
+        new_distribution = [new_distribution[i]/max(new_distribution) for i in range(len(distribution))]
+        norm = numpy.linalg.norm(numpy.subtract(new_distribution, distribution))
+
+        while norm > 0.001:
+            distribution = new_distribution
+            new_distribution = numpy.zeros(shape=len(distribution))
+            for i in range(len(distribution)):
+                for j in range(len(distribution)):
+                    new_distribution[i] += (matrix[i][j] * distribution[j])
+            new_distribution = [new_distribution[i] / max(new_distribution) for i in range(len(distribution))]
+            norm = numpy.linalg.norm(numpy.subtract(new_distribution, distribution))
+
+        return new_distribution
+
+    prior_distribution = [ranked_sentences[i][scorebase] for i in range(len(ranked_sentences))]
+    print(prior_distribution)
+    matrix_length = len(cosine_matrix)
+    node_degree = numpy.zeros(shape=matrix_length)
+
+    for i in range(matrix_length):
+        for j in range(matrix_length):
+            if cosine_matrix[i][j] > cos_threshold:
+                cosine_matrix[i][j] = 1
+                node_degree[i] += 1
+            else:
+                cosine_matrix[i][j] = 0
+
+    cosine_matrix = [[((cosine_matrix[i][j] / node_degree[i]) * lambda_value) +
+                      ((1 - lambda_value) * prior_distribution[j]) for j in range(matrix_length)]
+                     for i in range(matrix_length)]
+
+    init_distribution = power_method(cosine_matrix, prior_distribution)
+    print(init_distribution)
+    g1_index = init_distribution.index(max(init_distribution))
+    g1_sent = cosine_matrix.pop(g1_index)
+    cosine_matrix.insert(0, g1_sent)
+    pprint(init_distribution)
+    # for i in range(len(cosine_matrix)):
+    #     print(cosine_matrix[i])
+    # print(power_method(cosine_matrix, prior_distribution))
+    return None
 
 
 def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):
@@ -455,7 +511,8 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
     return formed_keyphrases
 
 
-def summarize(corpus, summary_length, threshold=0.1, drank=False, mmr=False, query=None, sort_score=False, split_sent=False, correct_sent=False, tokenize_sent=True):
+def summarize(corpus, summary_length, threshold=0.001, drank=False, mmr=False, query=None, sort_score=False,
+              split_sent=False, correct_sent=False, tokenize_sent=True):
     """Summarizes a document using the the Lexical PageRank Algorithm
 
         The documentation and option for using the DivRank Algorithm is not yet set.
@@ -490,7 +547,8 @@ def summarize(corpus, summary_length, threshold=0.1, drank=False, mmr=False, que
 
     scorebase = "divrank_score" if drank else "lexrank_score"
     summary_scores = divrank(summary_scores, cosine_matrix, threshold) if drank else lexrank(summary_scores, cosine_matrix, threshold)
-    summary_scores = maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase=scorebase) if mmr else summary_scores
+    summary_scores = maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase) if mmr else summary_scores
+    grasshopper(sentences["normalized"], summary_scores, cosine_matrix, scorebase)
 
     sort_criteria = (("mmr_score" if mmr else "divrank_score") if drank else ("mmr_score" if mmr else "lexrank_score"))
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
