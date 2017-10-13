@@ -7,6 +7,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 from pprint import pprint
 import warnings
+
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
@@ -69,7 +70,8 @@ def normalize_text(text, tokenize_sentence=True, correct_spelling=False):
     sc_regex_compiled = re.compile(pattern=sc_regex_string)
 
     wordnet_lemmatizer = WordNetLemmatizer()
-    word = 0; tag = 1
+    word = 0;
+    tag = 1
     pos_tag_map = {
         "ADJ": wordnet.ADJ,
         "VERB": wordnet.VERB,
@@ -113,8 +115,8 @@ def term_frequency(sentences, n_gram=1):
         for i in range(len(sentence) - n_gram + 1):
             word = ""
             for j in range(n_gram):
-                word += sentence[i+j]
-                if j != n_gram-1:
+                word += sentence[i + j]
+                if j != n_gram - 1:
                     word += " "
             word_dictionary.add(word)
 
@@ -231,7 +233,7 @@ def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
         return new_lexrank
 
     initial_lexrank = numpy.zeros(shape=len(cosine_matrix))
-    initial_lexrank.fill(1/len(initial_lexrank))
+    initial_lexrank.fill(1 / len(initial_lexrank))
     new_lexrank = generate_lexrank(initial_lexrank, cosine_matrix)
     lexrank_vector = new_lexrank - initial_lexrank
     delta_value = numpy.linalg.norm(lexrank_vector)
@@ -248,7 +250,11 @@ def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
     return sentences
 
 
+<<<<<<< HEAD
 def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0.25, beta_value=None,
+=======
+def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value=0.25, beta_value=0.3,
+>>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
             cos_threshold=0.1):
     """Computes the divrank for the corresponding given cosine matrix.
         A novel ranking algorithm based on a reinforced random walk in an information network.
@@ -272,7 +278,7 @@ def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0
     """
 
     def organic_value(x, y, cosine_matrix):
-        return (1 - alpha_value) if x == y else (alpha_value*cosine_matrix[x][y])
+        return (1 - alpha_value) if x == y else (alpha_value * cosine_matrix[x][y])
 
     def generate_divrank(old_divrank, cosine_matrix, beta_value):
         divrank_length = len(old_divrank)
@@ -291,8 +297,13 @@ def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0
                 summation_j += (old_divrank[j] * ((organic_value(j, i, cosine_matrix) * visited_n[i]) / summation_k))
                 if organic_value(j, i, cosine_matrix):
                     visited_n[i] += 1
+<<<<<<< HEAD
             prior_distribution = numpy.power(i + 1, beta_value * -1) if beta_value else (1/divrank_length)
             new_divrank[i] = ((1 - lambda_value) * prior_distribution) + (lambda_value * summation_j)
+=======
+            new_divrank[i] = ((1 - damping_factor) * numpy.power(i + 1, beta_value * -1)) + (
+                damping_factor * summation_j)
+>>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
         return new_divrank
 
     matrix_length = len(cosine_matrix)
@@ -304,8 +315,13 @@ def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0
                 node_degree[i] += 1
             else:
                 cosine_matrix[i][j] = 0
+<<<<<<< HEAD
     cosine_matrix = [[cosine_matrix[i][j]/node_degree[i] for j in range(matrix_length)] for i in
                      range(matrix_length)]
+=======
+    cosine_matrix = [[cosine_matrix[i][j] / node_degree[i] for j in range(divrank_length)] for i in
+                     range(divrank_length)]
+>>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
 
     initial_divrank = numpy.zeros(shape=matrix_length)
     initial_divrank.fill(1 / matrix_length)
@@ -481,7 +497,8 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
 
     sc_regex_string = "[{}]".format(re.escape(string.punctuation))
     sc_regex_compiled = re.compile(pattern=sc_regex_string)
-    word = 0; tag = 1
+    word = 0;
+    tag = 1
     formed_noun = ""
 
     phrase_tag_list = ["DT", "JJ", "NN", "NNS", "NNP", "NNPS"]
@@ -511,7 +528,11 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
     return formed_keyphrases
 
 
+<<<<<<< HEAD
 def summarize(corpus, summary_length, threshold=0.001, drank=False, mmr=False, query=None, sort_score=False,
+=======
+def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, query=None, sort_score=False,
+>>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
               split_sent=False, correct_sent=False, tokenize_sent=True):
     """Summarizes a document using the the Lexical PageRank Algorithm
 
@@ -541,19 +562,27 @@ def summarize(corpus, summary_length, threshold=0.001, drank=False, mmr=False, q
 
     summary_scores = [{
         "index": i,
-        "raw_text": sentences["raw"][i].capitalize().replace('\n',""),
+        "raw_text": sentences["raw"][i].capitalize().replace('\n', ""),
         "norm_text": ",".join(sentences["normalized"][i])
     } for i in range(len(sentences["raw"]))]
 
     scorebase = "divrank_score" if drank else "lexrank_score"
+<<<<<<< HEAD
     summary_scores = divrank(summary_scores, cosine_matrix, threshold) if drank else lexrank(summary_scores, cosine_matrix, threshold)
     summary_scores = maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase) if mmr else summary_scores
     grasshopper(sentences["normalized"], summary_scores, cosine_matrix, scorebase)
+=======
+    summary_scores = divrank(summary_scores, cosine_matrix, threshold) if drank else lexrank(summary_scores,
+                                                                                             cosine_matrix, threshold)
+    summary_scores = maximal_marginal_relevance(sentences["normalized"], summary_scores, query,
+                                                scorebase=scorebase) if mmr else summary_scores
+>>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
 
     sort_criteria = (("mmr_score" if mmr else "divrank_score") if drank else ("mmr_score" if mmr else "lexrank_score"))
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
     summary_scores = summary_scores[:summary_length]
-    summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria if sort_score else "index"], reverse=sort_score)
+    summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria if sort_score else "index"],
+                            reverse=sort_score)
     summary_text = [sentence["raw_text"] for sentence in summary_scores]
     summary_text = (" ").join(summary_text) if not split_sent else summary_text
 
