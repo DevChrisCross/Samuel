@@ -3,8 +3,8 @@ import re
 import string
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
+from pprint import pprint
 import warnings
-import Translator
 
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
@@ -286,8 +286,9 @@ def __lemmatize(tokens):
             pos_tag = wordnet.ADV
         else:
             pos_tag = None
-        lemmatized_token = wordnet_lemmatizer.lemmatize(token, pos_tag)
-        lemmatized_tokens.append(lemmatized_token)
+        if pos_tag:
+            lemmatized_token = wordnet_lemmatizer.lemmatize(token, pos_tag)
+            lemmatized_tokens.append(lemmatized_token)
 
     return lemmatized_tokens
 
