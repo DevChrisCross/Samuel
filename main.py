@@ -350,6 +350,13 @@ documentString = u"Extraordinary hotel. " \
                  u"This hotel has good services, bad dogs, super qualified staffs. " \
                  u"hotel hotel hotel."
 
+kingsman = u"Another witty and fun, action film by Matthew Vaughn. " \
+           u"Taron Egerton and Colin Firth come together once more to recreate their fantastic spy duo. " \
+           u"Though the movie lacks in parts of what it promised in the trailers and details of what many fans may have hoped. " \
+           u"It begrudgingly makes up for though its eye-popping visuals, " \
+           u"great new characters, and a clear believable storyline of Harry Hart's revival. Kingsman: " \
+           u"The Golden Circle is a near pitch perfect sequel to relive the entertainment of Kingsman: The Secret Service."
+
 sample = u"<p class='alert alert-info'>The food is <span> great </span> but the service is not good.</p>"
 
 book_review = u"I'm going to keep this brief since there isn't much to say that hasn't already been said. *clears throat* " \
@@ -367,10 +374,10 @@ book_review = u"I'm going to keep this brief since there isn't much to say that 
               u"a hero. Harry is kind to those that deserve it, fearless when it counts the most, and wonderfully intelligent." \
               u"What's not to love? "
 
-normalize_corpus(documentString)
+normalize_corpus(kingsman)
 
-corpus, tokens, sentence_n = Normalize.normalize_corpus(sample)
-print(corpus)
-print(tokens)
-print(sentence_n)
+# corpus, tokens, sentence_n = Normalize.normalize_corpus(sample)
+# print(corpus)
+# print(tokens)
+# print(sentence_n)
 

@@ -537,8 +537,8 @@ Like other creatures, Dragons are generated randomly in the world and will engag
 The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
 """
 
-pprint(summarize(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
-pprint(summarize(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, sort_score=True))
+# pprint(summarize(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
+# pprint(summarize(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, sort_score=True))
 # pprint(extract_keyphrase(document2))
 
 
