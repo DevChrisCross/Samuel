@@ -19,7 +19,7 @@ hugot_pa = u"Masakit ang magmahal, pero hindi mo masasabing nagmamahal ka kung d
 hugot_na_hugot = u"Sabi nila kung mahal mo hindi mo siya iiwan, " \
                  u"pero minsan kailangan mong iwanan kasi nga mahal mo siya, " \
                  u"and you know na ayun ung magpapaligaya sa kanya. Let go mo nalang siya, and know that the best is yet to come." \
-                 u"May nakalaag pag-ibig para sayo." \
+                 u"May nakalaang pag-ibig para sayo." \
                  u"Kailangan mo lang matututong maghintay"
 
-print(translate(hugot_na_hugot))
+print(translate(hugot))
