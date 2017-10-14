@@ -250,11 +250,7 @@ def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
     return sentences
 
 
-<<<<<<< HEAD
 def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0.25, beta_value=None,
-=======
-def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value=0.25, beta_value=0.3,
->>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
             cos_threshold=0.1):
     """Computes the divrank for the corresponding given cosine matrix.
         A novel ranking algorithm based on a reinforced random walk in an information network.
@@ -297,13 +293,8 @@ def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value
                 summation_j += (old_divrank[j] * ((organic_value(j, i, cosine_matrix) * visited_n[i]) / summation_k))
                 if organic_value(j, i, cosine_matrix):
                     visited_n[i] += 1
-<<<<<<< HEAD
             prior_distribution = numpy.power(i + 1, beta_value * -1) if beta_value else (1/divrank_length)
             new_divrank[i] = ((1 - lambda_value) * prior_distribution) + (lambda_value * summation_j)
-=======
-            new_divrank[i] = ((1 - damping_factor) * numpy.power(i + 1, beta_value * -1)) + (
-                damping_factor * summation_j)
->>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
         return new_divrank
 
     matrix_length = len(cosine_matrix)
@@ -315,13 +306,8 @@ def divrank(sentences, cosine_matrix, threshold, damping_factor=0.9, alpha_value
                 node_degree[i] += 1
             else:
                 cosine_matrix[i][j] = 0
-<<<<<<< HEAD
     cosine_matrix = [[cosine_matrix[i][j]/node_degree[i] for j in range(matrix_length)] for i in
                      range(matrix_length)]
-=======
-    cosine_matrix = [[cosine_matrix[i][j] / node_degree[i] for j in range(divrank_length)] for i in
-                     range(divrank_length)]
->>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
 
     initial_divrank = numpy.zeros(shape=matrix_length)
     initial_divrank.fill(1 / matrix_length)
@@ -528,11 +514,8 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
     return formed_keyphrases
 
 
-<<<<<<< HEAD
-def summarize(corpus, summary_length, threshold=0.001, drank=False, mmr=False, query=None, sort_score=False,
-=======
+
 def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, query=None, sort_score=False,
->>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
               split_sent=False, correct_sent=False, tokenize_sent=True):
     """Summarizes a document using the the Lexical PageRank Algorithm
 
@@ -567,16 +550,9 @@ def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, qu
     } for i in range(len(sentences["raw"]))]
 
     scorebase = "divrank_score" if drank else "lexrank_score"
-<<<<<<< HEAD
     summary_scores = divrank(summary_scores, cosine_matrix, threshold) if drank else lexrank(summary_scores, cosine_matrix, threshold)
     summary_scores = maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase) if mmr else summary_scores
     grasshopper(sentences["normalized"], summary_scores, cosine_matrix, scorebase)
-=======
-    summary_scores = divrank(summary_scores, cosine_matrix, threshold) if drank else lexrank(summary_scores,
-                                                                                             cosine_matrix, threshold)
-    summary_scores = maximal_marginal_relevance(sentences["normalized"], summary_scores, query,
-                                                scorebase=scorebase) if mmr else summary_scores
->>>>>>> 5e55136d258af4bd5ee351c79c243d553a8cf843
 
     sort_criteria = (("mmr_score" if mmr else "divrank_score") if drank else ("mmr_score" if mmr else "lexrank_score"))
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
@@ -624,7 +600,7 @@ Like other creatures, Dragons are generated randomly in the world and will engag
 The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
 """
 
-# pprint(summarize(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
+# pprint(summarizer(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
 # pprint(summarize(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, sort_score=True))
 # pprint(extract_keyphrase(document2))
 
