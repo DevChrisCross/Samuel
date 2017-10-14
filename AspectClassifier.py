@@ -11,7 +11,7 @@ import nltk
 from collections import Counter
 from io import StringIO
 from nltk.corpus import wordnet
-import summarizer_v2
+import Summarizer
 
 
 def get_nouns(corpus):
@@ -48,7 +48,7 @@ corpus = [("hotel is luxurious, eloquent, beautifull designed and everyone makes
 
 sent_array = [corpus[i][0] for i in range(len(corpus))]
 # corpus = Normalize.normalize_corpus(sent_array)
-corpus = summarizer_v2.normalize_text(sent_array, tokenize_sentence=False)
+corpus = Summarizer.normalize_text(sent_array, tokenize_sentence=False)
 # print(corpus["normalized"])
 nouns = get_nouns("".join(corpus["raw"]))
 aspect = get_aspect(nouns)

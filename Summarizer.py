@@ -7,96 +7,8 @@ from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 from pprint import pprint
 import warnings
-
+import Normalize
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
-
-
-def normalize_text(text, tokenize_sentence=True, correct_spelling=False):
-    """A function that performs text normalization.
-
-    Tokenizes sentences and words, removes stopwords and special characters
-     performs lemmatization on words, and further remove words which does not
-     qualify in the part-of-speech tag map.
-
-    :param text: string. the text to be normalized
-    :param tokenize_sentence: boolean. if the text input should be tokenize into sentences
-        It should be set to false if the text input is an array of sentences
-    :param correct_spelling: boolean. if the spelling of words should be checked and corrected
-    :return: {normalized, raw} dictionary. contains the normalized and raw sentences
-    """
-
-    def correct_word(word):
-        """Corrects the misspelled word
-
-        Corrects the word by removing irregular repeated letters,
-        and further corrects it by suggesting possible intended words to be used
-        using the PyEnchant library. You can check it at http://pythonhosted.org/pyenchant/api/enchant.html
-
-        :param word: string. the word to be corrected
-        :return: string. the corrected word
-        """
-
-        def check_word(old_word):
-            if wordnet.synsets(old_word):
-                return old_word
-            else:
-                new_word = repeat_regex_compiled.sub(string=old_word, repl=match_substitution)
-                new_word = new_word if new_word == old_word else check_word(new_word)
-                return new_word
-
-        enchant_dict = enchant.Dict("en_US")
-        match_substitution = r'\1\2\3'
-        repeat_regex_string = r'(\w*)(\w)\2(\w*)'
-        repeat_regex_compiled = re.compile(pattern=repeat_regex_string)
-
-        initial_correct_word = check_word(word)
-        word_suggestions = enchant_dict.suggest(initial_correct_word)
-        is_word_correct = enchant_dict.check(initial_correct_word)
-
-        if is_word_correct:
-            return initial_correct_word
-        else:
-            final_correct_word = word_suggestions[0] if word_suggestions else initial_correct_word
-            return final_correct_word
-
-    raw_sentences = nltk.sent_tokenize(text) if tokenize_sentence else text
-    tokenized_sentences = [nltk.word_tokenize(sentence) for sentence in raw_sentences]
-    tagged_sentences = nltk.pos_tag_sents(tokenized_sentences, tagset="universal")
-
-    stopwords_en = nltk.corpus.stopwords.words('english')
-    stopwords_en.extend(["n't", "'s", "'d", "'t", "'ve", "'ll"])
-
-    sc_regex_string = "[{}]".format(re.escape(string.punctuation))
-    sc_regex_compiled = re.compile(pattern=sc_regex_string)
-
-    wordnet_lemmatizer = WordNetLemmatizer()
-    word = 0;
-    tag = 1
-    pos_tag_map = {
-        "ADJ": wordnet.ADJ,
-        "VERB": wordnet.VERB,
-        "NOUN": wordnet.NOUN,
-        "ADV": wordnet.ADV
-    }
-
-    normalized_sentences = list()
-    for sentence in tagged_sentences:
-        new_sentence = list()
-        for tagged_word in sentence:
-            if tagged_word[word] not in stopwords_en:
-                is_special_character = sc_regex_compiled.sub(string=tagged_word[word], repl="") == ""
-                tagged_word = None if is_special_character else tagged_word
-                if tagged_word and tagged_word[tag] in pos_tag_map:
-                    wordnet_tag = pos_tag_map[tagged_word[tag]]
-                    lemmatized_word = wordnet_lemmatizer.lemmatize(tagged_word[word], wordnet_tag)
-                    lemmatized_word = correct_word(lemmatized_word) if correct_spelling else lemmatized_word
-                    new_sentence.append(lemmatized_word.lower())
-        normalized_sentences.append(new_sentence)
-
-    return {
-        "normalized": normalized_sentences,
-        "raw": raw_sentences
-    }
 
 
 def term_frequency(sentences, n_gram=1):
@@ -362,7 +274,7 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, la
 
         return mmr
 
-    query = normalize_text(query)
+    query = Normalize.normalize_text(query)
     sentences.append(query["normalized"][0])
     tf = term_frequency(sentences)
     idf = inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
@@ -467,7 +379,7 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
 
         return similarity_score
 
-    sentences = normalize_text(text, tokenize_sent, correct_sent)
+    sentences = Normalize.normalize_text(text, None, tokenize_sent, correct_sent)
     tf = term_frequency(sentences["normalized"], n_gram)
     word_dict = {word: 0 for word in tf["word_dictionary"]}
     for sentence in tf["word_vector"]:
@@ -538,7 +450,7 @@ def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, qu
         raise ValueError("You need to provide a query to enable mmr.")
 
     keywords = extract_keyphrase(corpus, correct_sent=correct_sent, tokenize_sent=tokenize_sent)
-    sentences = normalize_text(corpus, tokenize_sent, correct_sent)
+    sentences = Normalize.normalize_text(corpus, None, tokenize_sent, correct_sent)
     tf = term_frequency(sentences["normalized"])
     idf = inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
     cosine_matrix = build_cosine_matrix(len(sentences["normalized"]), tf["word_vector"], idf)
@@ -600,7 +512,7 @@ Like other creatures, Dragons are generated randomly in the world and will engag
 The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
 """
 
-# pprint(summarizer(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
+pprint(summarizer(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
 # pprint(summarize(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, sort_score=True))
 # pprint(extract_keyphrase(document2))
 
