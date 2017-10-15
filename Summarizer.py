@@ -2,9 +2,6 @@ import re
 import numpy
 import string
 import nltk
-import enchant
-from nltk.stem import WordNetLemmatizer
-from nltk.corpus import wordnet
 from pprint import pprint
 import warnings
 import Normalize
@@ -108,7 +105,7 @@ def build_cosine_matrix(sent_length, tf, idf):
 
 def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
     """Computes the Lexrank for the corresponding given cosine matrix. A ranking algorithm which involves
-       computing sentence importance based on the concept of eigenvector centrality in a graph representation of sentences.
+    computing sentence importance based on the concept of eigenvector centrality in a graph representation of sentences.
 
     LexRank: Graph-based Lexical Centrality as Salience in Text Summarization
         Güneş Erkan         gerkan@umich.edu
@@ -119,8 +116,8 @@ def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
 
     :param sentences: the array in which the lexrank score of each sentence will be stored
     :param cosine_matrix: the cosine matrix to be ranked by Lexical PageRank
-    :param threshold: a decimal value ranging [0, 1]. the threshold value for the algorithm
-    :param damping_factor: a decimal value ranging [0, 1] the convergence value for the algorithm
+    :param threshold: [0, 1]. the threshold value for the algorithm
+    :param damping_factor: [0, 1] the convergence value for the algorithm
     :return: array of sentences and their corresponding lexrank score
     """
 
@@ -177,10 +174,10 @@ def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0
 
     :param sentences: the normalized array of sentences
     :param cosine_matrix: the cosine matrix to be ranked by Diverse Rank
-    :param threshold: a decimal value ranging [0, 1]. the threshold value for the algorithm
-    :param lambda_value: a decimal value ranging [0, 1] the convergence value for the algorithm
-    :param alpha_value: a decimal value ranging [0, 1] the value from which the organic transition probability is produced
-    :param beta_value: a decimal value ranging [0, 1] the value from which the prior transition probability is produced
+    :param threshold: [0, 1]. the threshold value for the algorithm
+    :param lambda_value: [0, 1] the convergence value for the algorithm
+    :param alpha_value: [0, 1] the value from which the organic transition probability is produced
+    :param beta_value: [0, 1] the value from which the prior transition probability is produced
     :param cos_threshold: the cosine threshold in which the cosine matrix becomes a binary cosine matrix
     :return: the sentences with their corresponding divrank scores
     """
@@ -240,7 +237,8 @@ def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0
 
 
 def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, lambda_value=0.7):
-    """A diversity based ranking technique used to maximize the relevance and novelty in finally retrieved top-ranked items.
+    """A diversity based ranking technique used to maximize the relevance
+        and novelty in finally retrieved top-ranked items.
 
     The Use of MMR, Diversity-Based Reranking for Reordering Documents and Producing Summaries
         Jaime Carbonell jgc@cs.cmu.edu
@@ -298,57 +296,51 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, la
     return ranked_sentences
 
 
-def grasshopper(sentences, ranked_sentences, cosine_matrix, scorebase, lambda_value=0.5, cos_threshold=0.1):
+def grasshopper(ranked_sentences, cosine_matrix, scorebase=None, alpha_value=0.25, lambda_value=0.5, cos_threshold=0.1):
 
-    def power_method(matrix, distribution=None):
-        if not distribution:
-            distribution = numpy.zeros(shape=len(matrix))
-            distribution.fill(1/len(matrix))
-        new_distribution = numpy.zeros(shape=len(distribution))
-        for i in range(len(distribution)):
-            for j in range(len(distribution)):
-                new_distribution[i] += (matrix[i][j] * distribution[j])
-        new_distribution = [new_distribution[i]/max(new_distribution) for i in range(len(distribution))]
+    def power_method(matrix, distribution):
+        new_distribution = numpy.dot(matrix, distribution)
+        new_distribution = numpy.divide(new_distribution, max(new_distribution))
         norm = numpy.linalg.norm(numpy.subtract(new_distribution, distribution))
 
         while norm > 0.001:
             distribution = new_distribution
-            new_distribution = numpy.zeros(shape=len(distribution))
-            for i in range(len(distribution)):
-                for j in range(len(distribution)):
-                    new_distribution[i] += (matrix[i][j] * distribution[j])
-            new_distribution = [new_distribution[i] / max(new_distribution) for i in range(len(distribution))]
+            new_distribution = numpy.dot(matrix, distribution)
+            new_distribution = numpy.divide(new_distribution, max(new_distribution))
             norm = numpy.linalg.norm(numpy.subtract(new_distribution, distribution))
 
-        return new_distribution
+        return new_distribution.tolist()
 
-    prior_distribution = [ranked_sentences[i][scorebase] for i in range(len(ranked_sentences))]
-    print(prior_distribution)
     matrix_length = len(cosine_matrix)
-    node_degree = numpy.zeros(shape=matrix_length)
+    prior_distribution = ([ranked_sentences[i][scorebase] for i in range(matrix_length)] if scorebase
+                          else [numpy.power(i+1, alpha_value*-1)for i in range(matrix_length)])
+    pdistrib = numpy.multiply(prior_distribution, (1 - lambda_value))
 
-    for i in range(matrix_length):
-        for j in range(matrix_length):
-            if cosine_matrix[i][j] > cos_threshold:
-                cosine_matrix[i][j] = 1
-                node_degree[i] += 1
-            else:
-                cosine_matrix[i][j] = 0
-
-    cosine_matrix = [[((cosine_matrix[i][j] / node_degree[i]) * lambda_value) +
-                      ((1 - lambda_value) * prior_distribution[j]) for j in range(matrix_length)]
+    cosine_matrix = [[(1 if cosine_matrix[i][j] > cos_threshold else 0) for j in range(matrix_length)]
                      for i in range(matrix_length)]
+    cosine_matrix = [numpy.divide(cosine_matrix[i], numpy.sum(cosine_matrix[i])) for i in range(matrix_length)]
+    cosine_matrix = numpy.multiply(cosine_matrix, lambda_value)
+    cosine_matrix = [numpy.add(cosine_matrix[i], pdistrib).tolist() for i in range(matrix_length)]
 
-    init_distribution = power_method(cosine_matrix, prior_distribution)
-    print(init_distribution)
-    g1_index = init_distribution.index(max(init_distribution))
-    g1_sent = cosine_matrix.pop(g1_index)
-    cosine_matrix.insert(0, g1_sent)
-    pprint(init_distribution)
-    # for i in range(len(cosine_matrix)):
-    #     print(cosine_matrix[i])
-    # print(power_method(cosine_matrix, prior_distribution))
-    return None
+    grasshopper_rank = list()
+    rank_iteration = int(numpy.ceil(matrix_length/2))
+    distribution = numpy.full(shape=matrix_length, fill_value=1/matrix_length)
+
+    for i in range(rank_iteration):
+        print(cosine_matrix)
+        stationary_distribution = power_method(cosine_matrix, distribution)
+        highest_score = stationary_distribution.index(max(stationary_distribution))
+        grasshopper_rank.append(highest_score)
+        cosine_matrix.pop(grasshopper_rank[i])
+        absorbing_markov = [(1 if j == grasshopper_rank[i] else 0) for j in range(matrix_length)]
+        cosine_matrix.insert(grasshopper_rank[i], absorbing_markov)
+        distribution = stationary_distribution
+
+    print(ranked_sentences)
+    for i in range(len(ranked_sentences)):
+        ranked_sentences[i]["grank"] = len(grasshopper_rank) - grasshopper_rank.index(i) if i in grasshopper_rank else -1
+
+    return sorted(ranked_sentences, key=lambda sentence: sentence["grank"], reverse=True)
 
 
 def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):
@@ -395,14 +387,13 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
 
     sc_regex_string = "[{}]".format(re.escape(string.punctuation))
     sc_regex_compiled = re.compile(pattern=sc_regex_string)
-    word = 0;
+    word = 0
     tag = 1
     formed_noun = ""
 
     phrase_tag_list = ["DT", "JJ", "NN", "NNS", "NNP", "NNPS"]
     noun_phrases = list()
     for i in range(len(chunked_sentences)):
-        # phrases = list()
         for j in range(len(chunked_sentences[i])):
             chunked_word = chunked_sentences[i][j]
             if hasattr(chunked_word, "label"):
@@ -421,7 +412,7 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
     for keyphrase in collocations:
         top_phrases = {phrase: word_similarity(keyphrase[0], phrase) for phrase in noun_phrases}
         top_phrases = sorted(top_phrases.items(), key=lambda word: word[1], reverse=True)
-        formed_keyphrases[keyphrase] = top_phrases[0]
+        formed_keyphrases[keyphrase[0]] = top_phrases[0]
 
     return formed_keyphrases
 
@@ -457,14 +448,16 @@ def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, qu
 
     summary_scores = [{
         "index": i,
-        "raw_text": sentences["raw"][i].capitalize().replace('\n', ""),
+        "raw_text": sentences["raw"][i].replace('\n', "").capitalize(),
         "norm_text": ",".join(sentences["normalized"][i])
     } for i in range(len(sentences["raw"]))]
 
     scorebase = "divrank_score" if drank else "lexrank_score"
-    summary_scores = divrank(summary_scores, cosine_matrix, threshold) if drank else lexrank(summary_scores, cosine_matrix, threshold)
-    summary_scores = maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase) if mmr else summary_scores
-    grasshopper(sentences["normalized"], summary_scores, cosine_matrix, scorebase)
+    summary_scores = (divrank(summary_scores, cosine_matrix, threshold)
+                      if drank else lexrank(summary_scores, cosine_matrix, threshold))
+    summary_scores = (maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase)
+                      if mmr else summary_scores)
+    pprint(grasshopper(summary_scores, cosine_matrix))
 
     sort_criteria = (("mmr_score" if mmr else "divrank_score") if drank else ("mmr_score" if mmr else "lexrank_score"))
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
@@ -472,7 +465,7 @@ def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, qu
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria if sort_score else "index"],
                             reverse=sort_score)
     summary_text = [sentence["raw_text"] for sentence in summary_scores]
-    summary_text = (" ").join(summary_text) if not split_sent else summary_text
+    summary_text = " ".join(summary_text) if not split_sent else summary_text
 
     return {
         "text": summary_text,
@@ -509,13 +502,12 @@ Over the course of the game, players improve their character's skills, which are
 There are eighteen skills divided evenly among the three schools of combat, magic, and stealth.
 Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's wilderness.
 Like other creatures, Dragons are generated randomly in the world and will engage in combat.
-The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
 """
 
-pprint(summarizer(document2, summary_length=3, mmr=True, query="Elder Scrolls Online"))
-# pprint(summarize(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, sort_score=True))
+pprint(summarizer(document2, summary_length=3, mmr=False, query="Elder Scrolls Online", drank=False))
+# pprint(summarizer(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
 # pprint(extract_keyphrase(document2))
-
+print(numpy.add([5,2,3], [5,3,2]))
 
 from gensim.summarization import summarize
 # print(summarize("""The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
