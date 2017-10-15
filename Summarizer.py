@@ -109,14 +109,16 @@ def build_cosine_matrix(sent_length, tf, idf):
 
 def power_method(transition_matrix, initial_state, generate_state=None, threshold=0.001):
     """
+    Computes for the stationary distribution of a given Markov chain or transition matrix
 
-    :param transition_matrix:
-    :param initial_state:
-    :param generate_state:
-    :param threshold:
-    :return:
+    :param transition_matrix: the matrix to be computed to
+    :param initial_state: the first state for initializing the power method
+    :param generate_state: if a function is supplied, it will be used instead to generate the next distribution
+        of the transition matrix
+    :param threshold: [0, 1] the value in which the method will converge
+    :return: the stationary distribution of the matrix
     """
-    
+
     new_state = (generate_state(initial_state, transition_matrix) if generate_state
                  else np.dot(transition_matrix, initial_state))
     new_state = np.divide(new_state, max(new_state))
@@ -133,6 +135,7 @@ def power_method(transition_matrix, initial_state, generate_state=None, threshol
 
 def lexrank(sentences, cosine_matrix, damping_factor=0.85, threshold=0.001):
     """
+    Lexical PageRank
     Computes the Lexrank for the corresponding given cosine matrix. A ranking algorithm which involves computing
     sentence importance based on the concept of eigen vector centrality in a graph representation of sentences.
 
@@ -172,8 +175,10 @@ def lexrank(sentences, cosine_matrix, damping_factor=0.85, threshold=0.001):
 
 def divrank(sentences, cosine_matrix, threshold=0.001, lambda_value=0.9, alpha_value=0.25, beta_value=None,
             cos_threshold=0.1):
-    """Computes the divrank for the corresponding given cosine matrix.
-        A novel ranking algorithm based on a reinforced random walk in an information network.
+    """
+    Diverse Rank
+    Computes the divrank for the corresponding given cosine matrix.
+    A novel ranking algorithm based on a reinforced random walk in an information network.
 
     DivRank: the Interplay of Prestige and Diversity in Information Networks
         Qiaozhu Mei     qmei@umich.edu
@@ -232,14 +237,27 @@ def divrank(sentences, cosine_matrix, threshold=0.001, lambda_value=0.9, alpha_v
 
 def grasshopper(ranked_sentences, cosine_matrix, scorebase=None, lambda_value=0.5, alpha_value=0.25, cos_threshold=0.1):
     """
+    Graph Random-walk with Absorbing StateS that HOPs among PEaks for Ranking
+    A partial implementation of the Grasshopper, a novel ranking algorithm based on random walks in an absorbing Markov
+    chain which ranks items with an emphasis on diversity.
 
-    :param ranked_sentences:
-    :param cosine_matrix:
-    :param scorebase:
-    :param lambda_value:
-    :param alpha_value:
-    :param cos_threshold:
-    :return:
+    Improving Diversity in Ranking using Absorbing Random Walks
+        Xiaojin Zhu          jerryzhu@cs.wisc.edu
+        Andrew B. Goldberg   goldberg@cs.wisc.edu
+        Jurgen Van Gaelj     vangael@cs.wisc.edu
+        David Andrzejewski   andrzeje@cs.wisc.edu
+        Department of Computer Sciences
+        University of Wisconsin, Madison, Madison, WI 53705
+    You can check the algorithm at http://pages.cs.wisc.edu/~jerryzhu/pub/grasshopper.pdf
+
+    :param ranked_sentences: an array of sentences that can be either ranked or unranked
+    :param cosine_matrix: the cosine matrix to be ranked by Grasshopper
+    :param scorebase: string. if scorebase has a value, the sentences will be considered ranked as input
+    :param lambda_value: [0, 1] the value to balance the interpolation in the cosine matrix
+    :param alpha_value: [0, 1] the value from which the prior distribution is produced if the sentences happens
+        to be unranked
+    :param cos_threshold: the cosine threshold in which the cosine matrix becomes a binary cosine matrix
+    :return: the sentences with their corresponding rank on the grasshopper
     """
 
     __length = len(ranked_sentences)
@@ -253,8 +271,7 @@ def grasshopper(ranked_sentences, cosine_matrix, scorebase=None, lambda_value=0.
                      for i in range(__length)]
     cosine_matrix = [np.divide(cosine_matrix[i], np.sum(cosine_matrix[i])) for i in range(__length)]
     cosine_matrix = np.multiply(cosine_matrix, lambda_value)
-    cosine_matrix = np.add(cosine_matrix, distribution_matrix)
-    cosine_matrix = cosine_matrix.tolist()
+    cosine_matrix = np.add(cosine_matrix, distribution_matrix).tolist()
 
     grasshopper_scores = list()
     rank_iteration = int(np.ceil(__length/2))
@@ -271,15 +288,17 @@ def grasshopper(ranked_sentences, cosine_matrix, scorebase=None, lambda_value=0.
         distribution = stationary_distribution
 
     for i in range(__length):
-        ranked_sentences[i]["grank"] = (len(grasshopper_scores) - grasshopper_scores.index(i)
+        ranked_sentences[i]["ghopper_score"] = (len(grasshopper_scores) - grasshopper_scores.index(i)
                                         if i in grasshopper_scores else -1)
-    ranked_sentences = sorted(ranked_sentences, key=lambda sentence: sentence["grank"], reverse=True)
+    ranked_sentences = sorted(ranked_sentences, key=lambda sentence: sentence["ghopper_score"], reverse=True)
     return ranked_sentences
 
 
 def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, lambda_value=0.7):
-    """A diversity based ranking technique used to maximize the relevance
-        and novelty in finally retrieved top-ranked items.
+    """
+    Maximal Marginal Relevance
+    A diversity based ranking technique used to maximize the relevance
+    and novelty in finally retrieved top-ranked items.
 
     The Use of MMR, Diversity-Based Reranking for Reordering Documents and Producing Summaries
         Jaime Carbonell jgc@cs.cmu.edu
@@ -411,17 +430,19 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
     return formed_keyphrases
 
 
-def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, query=None, sort_score=False,
-              split_sent=False, correct_sent=False, tokenize_sent=True):
-    """Summarizes a document using the the Lexical PageRank Algorithm
-
-        The documentation and option for using the DivRank Algorithm is not yet set.
+def summarizer(corpus, summary_length, threshold=0.001, rank="D", rerank=False, query=None, sort_score=False,
+               split_sent=False, correct_sent=False, tokenize_sent=True):
+    """
+    Summarizes a document using the specified ranking algorithm set by the user.
 
     :param corpus: the document to be summarized
     :param summary_length: the number of sentences needed in the summary
-    :param threshold: the threshold value of the LexRank Algorithm
-    :param mmr: boolean. enables the Maximal Marginal Relevance Algorithm
-    :param query: string. the query needed to enable mmr
+    :param threshold: the threshold value for the stationary distribution of the algorithm
+    :param rank: ['D','L','G'] namely DivRank, LexRank, Grasshopper
+        decides which ranking algorithm will be used for the summarization
+    :param rerank: boolean. if enabled, the module will used a reranking algorithm, Grasshopper by default
+    :param query: string. supplying a query automatically uses a reranking algorithm, the the Maximal Marginal Relevance
+        and overrides the Grasshopper if rerank is enabled
     :param sort_score: boolean. if the sentences should be sorted by appearance or score
     :param split_sent: boolean. if the output should be an array of sentences or an entire string
     :param correct_sent: boolean. if the text normalization module should perform a word correcting
@@ -429,9 +450,6 @@ def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, qu
         It should be set to false if the text input is an array of sentences
     :return: {text, score} a dictionary that returns the text summary, and the corresponding scores of the sentences
     """
-
-    if mmr and not query:
-        raise ValueError("You need to provide a query to enable mmr.")
 
     keywords = extract_keyphrase(corpus, correct_sent=correct_sent, tokenize_sent=tokenize_sent)
     sentences = Normalize.normalize_text(corpus, None, tokenize_sent, correct_sent)
@@ -445,14 +463,21 @@ def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, qu
         "norm_text": ",".join(sentences["normalized"][i])
     } for i in range(len(sentences["raw"]))]
 
-    scorebase = "divrank_score" if drank else "lexrank_score"
-    summary_scores = (divrank(summary_scores, cosine_matrix, threshold)
-                      if drank else lexrank(summary_scores, cosine_matrix, threshold))
+    rank_map = {
+        "D": {"system": "divrank_score", "process": divrank(summary_scores, cosine_matrix, threshold)},
+        "L": {"system": "lexrank_score", "process": lexrank(summary_scores, cosine_matrix, threshold)},
+        "G": {"system": "ghopper_score", "process": grasshopper(summary_scores, cosine_matrix)}
+    }
+    scorebase = rank_map[rank]["system"]
+    summary_scores = rank_map[rank]["process"]
+    summary_scores = (grasshopper(summary_scores, cosine_matrix, scorebase)
+                      if rerank and rank_map[rank] != "G" and not query
+                      else summary_scores)
     summary_scores = (maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase)
-                      if mmr else summary_scores)
-    # pprint(grasshopper(summary_scores, cosine_matrix))
+                      if query and rank_map[rank] != "G"
+                      else summary_scores)
 
-    sort_criteria = (("mmr_score" if mmr else "divrank_score") if drank else ("mmr_score" if mmr else "lexrank_score"))
+    sort_criteria = "mmr_score" if query else scorebase
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
     summary_scores = summary_scores[:summary_length]
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria if sort_score else "index"],
@@ -497,10 +522,10 @@ Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's 
 Like other creatures, Dragons are generated randomly in the world and will engage in combat.
 """
 
-pprint(summarizer(document2, summary_length=3, mmr=False, query="Elder Scrolls Online", drank=False))
-# pprint(summarizer(document1, summary_length=3, mmr=False, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
+pprint(summarizer(document2, summary_length=5, rank="G"))
+# pprint(summarizer(document1, summary_length=3, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
 # pprint(extract_keyphrase(document2))
-print(numpy.add([5,2,3], [5,3,2]))
+# print(numpy.add([5,2,3], [5,3,2]))
 
 from gensim.summarization import summarize
 # print(summarize("""The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
