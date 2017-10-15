@@ -1,6 +1,5 @@
 import re
 import numpy as np
-# import numpy
 import string
 import nltk
 from pprint import pprint
@@ -9,7 +8,69 @@ import Normalize
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
-def term_frequency(sentences, n_gram=1):
+def summarizer(corpus, summary_length, threshold=0.001, rank="D", rerank=False, query=None, sort_score=False,
+               split_sent=False, correct_sent=False, tokenize_sent=True):
+    """
+    Summarizes a document using the specified ranking algorithm set by the user.
+
+    :param corpus: the document to be summarized
+    :param summary_length: the number of sentences needed in the summary
+    :param threshold: the threshold value for the stationary distribution of the algorithm
+    :param rank: ['D','L','G'] namely DivRank, LexRank, Grasshopper
+        decides which ranking algorithm will be used for the summarization
+    :param rerank: boolean. if enabled, the module will used a reranking algorithm, Grasshopper by default
+    :param query: string. supplying a query automatically uses a reranking algorithm, the the Maximal Marginal Relevance
+        and overrides the Grasshopper if rerank is enabled
+    :param sort_score: boolean. if the sentences should be sorted by appearance or score
+    :param split_sent: boolean. if the output should be an array of sentences or an entire string
+    :param correct_sent: boolean. if the text normalization module should perform a word correcting
+    :param tokenize_sent: boolean. if the text input should be tokenize into sentences
+        It should be set to false if the text input is an array of sentences
+    :return: {text, score} a dictionary that returns the text summary, and the corresponding scores of the sentences
+    """
+
+    keywords = __extract_keyphrase(corpus, correct_sent=correct_sent, tokenize_sent=tokenize_sent)
+    sentences = Normalize.normalize_text(corpus, None, tokenize_sent, correct_sent)
+    tf = __term_frequency(sentences["normalized"])
+    idf = __inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
+    cosine_matrix = __build_cosine_matrix(len(sentences["normalized"]), tf["word_vector"], idf)
+
+    summary_scores = [{
+        "index": i,
+        "raw_text": sentences["raw"][i].replace('\n', "").capitalize(),
+        "norm_text": ",".join(sentences["normalized"][i])
+    } for i in range(len(sentences["raw"]))]
+
+    rank_map = {
+        "D": {"system": "divrank_score", "process": __divrank(summary_scores, cosine_matrix, threshold)},
+        "L": {"system": "lexrank_score", "process": __lexrank(summary_scores, cosine_matrix, threshold)},
+        "G": {"system": "ghopper_score", "process": __grasshopper(summary_scores, cosine_matrix)}
+    }
+    scorebase = rank_map[rank]["system"]
+    summary_scores = rank_map[rank]["process"]
+    summary_scores = (__grasshopper(summary_scores, cosine_matrix, scorebase)
+                      if rerank and rank_map[rank] != "G" and not query
+                      else summary_scores)
+    summary_scores = (__maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase)
+                      if query and rank_map[rank] != "G"
+                      else summary_scores)
+
+    sort_criteria = "mmr_score" if query else scorebase
+    summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
+    summary_scores = summary_scores[:summary_length]
+    summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria if sort_score else "index"],
+                            reverse=sort_score)
+    summary_text = [sentence["raw_text"] for sentence in summary_scores]
+    summary_text = " ".join(summary_text) if not split_sent else summary_text
+
+    return {
+        "text": summary_text,
+        "score": summary_scores,
+        "keywords": keywords
+    }
+
+
+def __term_frequency(sentences, n_gram=1):
     """
     Feature extractor using the Bag-of-Words model
 
@@ -48,7 +109,7 @@ def term_frequency(sentences, n_gram=1):
     }
 
 
-def inverse_document_frequency(tf, dictionary):
+def __inverse_document_frequency(tf, dictionary):
     """
     Feature Extraction partially from the known TF-IDF model
 
@@ -68,7 +129,7 @@ def inverse_document_frequency(tf, dictionary):
     return inv_frequency
 
 
-def build_cosine_matrix(sent_length, tf, idf):
+def __build_cosine_matrix(sent_length, tf, idf):
     """
     Constructs a idf modified cosine similarity matrix
 
@@ -107,7 +168,7 @@ def build_cosine_matrix(sent_length, tf, idf):
     return cosine_matrix
 
 
-def power_method(transition_matrix, initial_state, generate_state=None, threshold=0.001):
+def __power_method(transition_matrix, initial_state, generate_state=None, threshold=0.001):
     """
     Computes for the stationary distribution of a given Markov chain or transition matrix
 
@@ -133,7 +194,7 @@ def power_method(transition_matrix, initial_state, generate_state=None, threshol
     return new_state.tolist()
 
 
-def lexrank(sentences, cosine_matrix, damping_factor=0.85, threshold=0.001):
+def __lexrank(sentences, cosine_matrix, damping_factor=0.85, threshold=0.001):
     """
     Lexical PageRank
     Computes the Lexrank for the corresponding given cosine matrix. A ranking algorithm which involves computing
@@ -166,15 +227,15 @@ def lexrank(sentences, cosine_matrix, damping_factor=0.85, threshold=0.001):
 
     __length = len(sentences)
     initial_state = np.full(shape=__length, fill_value=1/__length)
-    lexrank_scores = power_method(cosine_matrix, initial_state, generate_state=generate_lexrank, threshold=threshold)
+    lexrank_scores = __power_method(cosine_matrix, initial_state, generate_state=generate_lexrank, threshold=threshold)
     for i in range(__length):
         sentences[i]["lexrank_score"] = float("{0:.3f}".format(lexrank_scores[i]))
 
     return sentences
 
 
-def divrank(sentences, cosine_matrix, threshold=0.001, lambda_value=0.9, alpha_value=0.25, beta_value=None,
-            cos_threshold=0.1):
+def __divrank(sentences, cosine_matrix, threshold=0.001, lambda_value=0.9, alpha_value=0.25, beta_value=None,
+              cos_threshold=0.1):
     """
     Diverse Rank
     Computes the divrank for the corresponding given cosine matrix.
@@ -228,14 +289,14 @@ def divrank(sentences, cosine_matrix, threshold=0.001, lambda_value=0.9, alpha_v
     cosine_matrix = [np.divide(cosine_matrix[i], np.sum(cosine_matrix[i])) for i in range(__length)]
 
     initial_state = np.full(shape=__length, fill_value=1/__length)
-    divrank_scores = power_method(cosine_matrix, initial_state, generate_state=generate_divrank, threshold=threshold)
+    divrank_scores = __power_method(cosine_matrix, initial_state, generate_state=generate_divrank, threshold=threshold)
     for i in range(__length):
         sentences[i]["divrank_score"] = float("{0:.3f}".format(divrank_scores[i]))
 
     return sentences
 
 
-def grasshopper(ranked_sentences, cosine_matrix, scorebase=None, lambda_value=0.5, alpha_value=0.25, cos_threshold=0.1):
+def __grasshopper(ranked_sentences, cosine_matrix, scorebase=None, lambda_value=0.5, alpha_value=0.25, cos_threshold=0.1):
     """
     Graph Random-walk with Absorbing StateS that HOPs among PEaks for Ranking
     A partial implementation of the Grasshopper, a novel ranking algorithm based on random walks in an absorbing Markov
@@ -278,7 +339,7 @@ def grasshopper(ranked_sentences, cosine_matrix, scorebase=None, lambda_value=0.
     distribution = np.full(shape=__length, fill_value=1/__length)
 
     for i in range(rank_iteration):
-        stationary_distribution = power_method(cosine_matrix, distribution)
+        stationary_distribution = __power_method(cosine_matrix, distribution)
         highest_score = stationary_distribution.index(max(stationary_distribution))
         grasshopper_scores.append(highest_score)
         cosine_matrix.pop(grasshopper_scores[i])
@@ -294,7 +355,7 @@ def grasshopper(ranked_sentences, cosine_matrix, scorebase=None, lambda_value=0.
     return ranked_sentences
 
 
-def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, lambda_value=0.7):
+def __maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, lambda_value=0.7):
     """
     Maximal Marginal Relevance
     A diversity based ranking technique used to maximize the relevance
@@ -334,9 +395,9 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, la
 
     query = Normalize.normalize_text(query)
     sentences.append(query["normalized"][0])
-    tf = term_frequency(sentences)
-    idf = inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
-    cosine_matrix = build_cosine_matrix(len(sentences), tf["word_vector"], idf)
+    tf = __term_frequency(sentences)
+    idf = __inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
+    cosine_matrix = __build_cosine_matrix(len(sentences), tf["word_vector"], idf)
 
     mmr_scores = list()
     while ranked_sentences:
@@ -356,7 +417,7 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, la
     return ranked_sentences
 
 
-def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):
+def __extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):
     """Extracts significant keywords or keyphrases that represents the idea of the entire text
 
     :param text: string. the text to bextracted the info from
@@ -385,7 +446,7 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
         return similarity_score
 
     sentences = Normalize.normalize_text(text, None, tokenize_sent, correct_sent)
-    tf = term_frequency(sentences["normalized"], n_gram)
+    tf = __term_frequency(sentences["normalized"], n_gram)
     word_dict = {word: 0 for word in tf["word_dictionary"]}
     for sentence in tf["word_vector"]:
         for word in tf["word_vector"][sentence]:
@@ -428,68 +489,6 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
         formed_keyphrases[keyphrase[0]] = top_phrases[0]
 
     return formed_keyphrases
-
-
-def summarizer(corpus, summary_length, threshold=0.001, rank="D", rerank=False, query=None, sort_score=False,
-               split_sent=False, correct_sent=False, tokenize_sent=True):
-    """
-    Summarizes a document using the specified ranking algorithm set by the user.
-
-    :param corpus: the document to be summarized
-    :param summary_length: the number of sentences needed in the summary
-    :param threshold: the threshold value for the stationary distribution of the algorithm
-    :param rank: ['D','L','G'] namely DivRank, LexRank, Grasshopper
-        decides which ranking algorithm will be used for the summarization
-    :param rerank: boolean. if enabled, the module will used a reranking algorithm, Grasshopper by default
-    :param query: string. supplying a query automatically uses a reranking algorithm, the the Maximal Marginal Relevance
-        and overrides the Grasshopper if rerank is enabled
-    :param sort_score: boolean. if the sentences should be sorted by appearance or score
-    :param split_sent: boolean. if the output should be an array of sentences or an entire string
-    :param correct_sent: boolean. if the text normalization module should perform a word correcting
-    :param tokenize_sent: boolean. if the text input should be tokenize into sentences
-        It should be set to false if the text input is an array of sentences
-    :return: {text, score} a dictionary that returns the text summary, and the corresponding scores of the sentences
-    """
-
-    keywords = extract_keyphrase(corpus, correct_sent=correct_sent, tokenize_sent=tokenize_sent)
-    sentences = Normalize.normalize_text(corpus, None, tokenize_sent, correct_sent)
-    tf = term_frequency(sentences["normalized"])
-    idf = inverse_document_frequency(tf["word_vector"], tf["word_dictionary"])
-    cosine_matrix = build_cosine_matrix(len(sentences["normalized"]), tf["word_vector"], idf)
-
-    summary_scores = [{
-        "index": i,
-        "raw_text": sentences["raw"][i].replace('\n', "").capitalize(),
-        "norm_text": ",".join(sentences["normalized"][i])
-    } for i in range(len(sentences["raw"]))]
-
-    rank_map = {
-        "D": {"system": "divrank_score", "process": divrank(summary_scores, cosine_matrix, threshold)},
-        "L": {"system": "lexrank_score", "process": lexrank(summary_scores, cosine_matrix, threshold)},
-        "G": {"system": "ghopper_score", "process": grasshopper(summary_scores, cosine_matrix)}
-    }
-    scorebase = rank_map[rank]["system"]
-    summary_scores = rank_map[rank]["process"]
-    summary_scores = (grasshopper(summary_scores, cosine_matrix, scorebase)
-                      if rerank and rank_map[rank] != "G" and not query
-                      else summary_scores)
-    summary_scores = (maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase)
-                      if query and rank_map[rank] != "G"
-                      else summary_scores)
-
-    sort_criteria = "mmr_score" if query else scorebase
-    summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
-    summary_scores = summary_scores[:summary_length]
-    summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria if sort_score else "index"],
-                            reverse=sort_score)
-    summary_text = [sentence["raw_text"] for sentence in summary_scores]
-    summary_text = " ".join(summary_text) if not split_sent else summary_text
-
-    return {
-        "text": summary_text,
-        "score": summary_scores,
-        "keywords": keywords
-    }
 
 
 document1 = [
