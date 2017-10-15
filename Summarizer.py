@@ -1,5 +1,6 @@
 import re
-import numpy
+import numpy as np
+# import numpy
 import string
 import nltk
 from pprint import pprint
@@ -9,7 +10,8 @@ warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
 def term_frequency(sentences, n_gram=1):
-    """Feature extractor using the Bag-of-Words model
+    """
+    Feature extractor using the Bag-of-Words model
 
     :param sentences: array. the normalized array of sentences which contains tokenized words.
     :param n_gram: the gram model in which the feature extraction will be performed.
@@ -47,7 +49,8 @@ def term_frequency(sentences, n_gram=1):
 
 
 def inverse_document_frequency(tf, dictionary):
-    """Feature Extraction partially from the known TF-IDF model
+    """
+    Feature Extraction partially from the known TF-IDF model
 
     :param tf: the term frequency matrix used and referenced for the idf
     :param dictionary: the dictionary used by the term frequency matrix
@@ -61,12 +64,13 @@ def inverse_document_frequency(tf, dictionary):
             if tf[row][word] != 0:
                 doc_frequency[word] += 1
 
-    inv_frequency = {word: numpy.log(float(total_docs) / doc_frequency[word]) for word in dictionary}
+    inv_frequency = {word: np.log(float(total_docs) / doc_frequency[word]) for word in dictionary}
     return inv_frequency
 
 
 def build_cosine_matrix(sent_length, tf, idf):
-    """Constructs a idf modified cosine similarity matrix
+    """
+    Constructs a idf modified cosine similarity matrix
 
     :param sent_length: the number of the sentences involved
     :param tf: the term frequency matrix of the sentences involved
@@ -75,7 +79,8 @@ def build_cosine_matrix(sent_length, tf, idf):
     """
 
     def idf_modified_cosine(x, y, tf, idf):
-        """Computes idf modified cosine similarity value of two sentences
+        """
+        Computes idf modified cosine similarity value of two sentences
 
         :param x: the index of the first sentence relevant to tf and idf
         :param y: the index of the second sentence relevant to tf and idf
@@ -89,23 +94,47 @@ def build_cosine_matrix(sent_length, tf, idf):
         dictionary = tf[x]
 
         for word in dictionary:
-            numerator += tf[x][word] * tf[y][word] * numpy.square(idf[word])
-            summation_x += numpy.square(tf[x][word] * idf[word])
-            summation_y += numpy.square(tf[y][word] * idf[word])
+            numerator += tf[x][word] * tf[y][word] * np.square(idf[word])
+            summation_x += np.square(tf[x][word] * idf[word])
+            summation_y += np.square(tf[y][word] * idf[word])
 
-        denominator = numpy.sqrt(summation_x) * numpy.sqrt(summation_y)
+        denominator = np.sqrt(summation_x) * np.sqrt(summation_y)
         idf_cosine = numerator / denominator
         idf_cosine = float("{0:.3f}".format(idf_cosine))
-
         return idf_cosine
 
     cosine_matrix = [[idf_modified_cosine(i, j, tf, idf) for j in range(sent_length)] for i in range(sent_length)]
     return cosine_matrix
 
 
-def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
-    """Computes the Lexrank for the corresponding given cosine matrix. A ranking algorithm which involves
-    computing sentence importance based on the concept of eigenvector centrality in a graph representation of sentences.
+def power_method(transition_matrix, initial_state, generate_state=None, threshold=0.001):
+    """
+
+    :param transition_matrix:
+    :param initial_state:
+    :param generate_state:
+    :param threshold:
+    :return:
+    """
+    
+    new_state = (generate_state(initial_state, transition_matrix) if generate_state
+                 else np.dot(transition_matrix, initial_state))
+    new_state = np.divide(new_state, max(new_state))
+    norm = np.linalg.norm(np.subtract(new_state, initial_state))
+
+    while norm > threshold:
+        old_state = new_state
+        new_state = (generate_state(old_state, transition_matrix) if generate_state
+                     else np.dot(transition_matrix, old_state))
+        new_state = np.divide(new_state, max(new_state))
+        norm = np.linalg.norm(np.subtract(new_state, old_state))
+    return new_state.tolist()
+
+
+def lexrank(sentences, cosine_matrix, damping_factor=0.85, threshold=0.001):
+    """
+    Computes the Lexrank for the corresponding given cosine matrix. A ranking algorithm which involves computing
+    sentence importance based on the concept of eigen vector centrality in a graph representation of sentences.
 
     LexRank: Graph-based Lexical Centrality as Salience in Text Summarization
         Güneş Erkan         gerkan@umich.edu
@@ -121,45 +150,27 @@ def lexrank(sentences, cosine_matrix, threshold, damping_factor=0.85):
     :return: array of sentences and their corresponding lexrank score
     """
 
-    def generate_lexrank(old_lexrank, cosine_matrix):
-        """Generates a new array of lexrank score based on the old lexrank
-
-        :param old_lexrank: array. the cuurent list of lexrank scores
-        :param cosine_matrix: the cosine matrix
-        :return: an array of lexrank scores
-        """
-
-        lexrank_length = len(old_lexrank)
-        new_lexrank = numpy.zeros(shape=lexrank_length)
-
-        for i in range(lexrank_length):
+    def generate_lexrank(old_state, cosine_matrix):
+        __length = len(old_state)
+        new_state = np.zeros(shape=__length)
+        for i in range(__length):
             summation_j = 0
-            for j in range(lexrank_length):
+            for j in range(__length):
                 summation_k = sum(cosine_matrix[j])
-                summation_j += (old_lexrank[j] * cosine_matrix[i][j]) / summation_k
-            new_lexrank[i] = (damping_factor / lexrank_length) + ((1 - damping_factor) * summation_j)
+                summation_j += (old_state[j] * cosine_matrix[i][j]) / summation_k
+            new_state[i] = (damping_factor / __length) + ((1 - damping_factor) * summation_j)
+        return new_state
 
-        return new_lexrank
-
-    initial_lexrank = numpy.zeros(shape=len(cosine_matrix))
-    initial_lexrank.fill(1 / len(initial_lexrank))
-    new_lexrank = generate_lexrank(initial_lexrank, cosine_matrix)
-    lexrank_vector = new_lexrank - initial_lexrank
-    delta_value = numpy.linalg.norm(lexrank_vector)
-
-    while delta_value > threshold:
-        old_lexrank = new_lexrank
-        new_lexrank = generate_lexrank(old_lexrank, cosine_matrix)
-        lexrank_vector = new_lexrank - old_lexrank
-        delta_value = numpy.linalg.norm(lexrank_vector)
-
-    for i in range(len(sentences)):
-        sentences[i]["lexrank_score"] = float("{0:.3f}".format(new_lexrank[i] / max(new_lexrank)))
+    __length = len(sentences)
+    initial_state = np.full(shape=__length, fill_value=1/__length)
+    lexrank_scores = power_method(cosine_matrix, initial_state, generate_state=generate_lexrank, threshold=threshold)
+    for i in range(__length):
+        sentences[i]["lexrank_score"] = float("{0:.3f}".format(lexrank_scores[i]))
 
     return sentences
 
 
-def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0.25, beta_value=None,
+def divrank(sentences, cosine_matrix, threshold=0.001, lambda_value=0.9, alpha_value=0.25, beta_value=None,
             cos_threshold=0.1):
     """Computes the divrank for the corresponding given cosine matrix.
         A novel ranking algorithm based on a reinforced random walk in an information network.
@@ -182,58 +193,88 @@ def divrank(sentences, cosine_matrix, threshold, lambda_value=0.9, alpha_value=0
     :return: the sentences with their corresponding divrank scores
     """
 
-    def organic_value(x, y, cosine_matrix):
-        return (1 - alpha_value) if x == y else (alpha_value * cosine_matrix[x][y])
+    def generate_divrank(old_state, cosine_matrix):
 
-    def generate_divrank(old_divrank, cosine_matrix, beta_value):
-        divrank_length = len(old_divrank)
-        new_divrank = numpy.zeros(shape=divrank_length)
-        visited_n = numpy.zeros(shape=divrank_length)
-        visited_n.fill(1)
+        def organic_value(x, y):
+            return (1 - alpha_value) if x == y else (alpha_value * cosine_matrix[x][y])
 
-        for i in range(divrank_length):
+        __length = len(old_state)
+        new_state = np.zeros(shape=__length)
+        visited_n = np.full(shape=__length, fill_value=1)
+
+        for i in range(__length):
             summation_j = 0
-            for j in range(divrank_length):
+            for j in range(__length):
                 summation_k = 0
-                for k in range(divrank_length):
-                    summation_k += (organic_value(j, k, cosine_matrix) * old_divrank[k] * visited_n[k])
-                    if organic_value(j, k, cosine_matrix):
+                for k in range(__length):
+                    summation_k += (organic_value(j, k) * old_state[k] * visited_n[k])
+                    if organic_value(j, k):
                         visited_n[k] += 1
-                summation_j += (old_divrank[j] * ((organic_value(j, i, cosine_matrix) * visited_n[i]) / summation_k))
-                if organic_value(j, i, cosine_matrix):
+                summation_j += (old_state[j] * ((organic_value(j, i) * visited_n[i]) / summation_k))
+                if organic_value(j, i):
                     visited_n[i] += 1
-            prior_distribution = numpy.power(i + 1, beta_value * -1) if beta_value else (1/divrank_length)
-            new_divrank[i] = ((1 - lambda_value) * prior_distribution) + (lambda_value * summation_j)
-        return new_divrank
+            prior_distribution = np.power(i+1, beta_value*-1) if beta_value else (1/__length)
+            new_state[i] = ((1 - lambda_value) * prior_distribution) + (lambda_value * summation_j)
+        return new_state
 
-    matrix_length = len(cosine_matrix)
-    node_degree = numpy.zeros(shape=matrix_length)
-    for i in range(matrix_length):
-        for j in range(matrix_length):
-            if cosine_matrix[i][j] > cos_threshold:
-                cosine_matrix[i][j] = 1
-                node_degree[i] += 1
-            else:
-                cosine_matrix[i][j] = 0
-    cosine_matrix = [[cosine_matrix[i][j]/node_degree[i] for j in range(matrix_length)] for i in
-                     range(matrix_length)]
+    __length = len(sentences)
+    cosine_matrix = [[(1 if cosine_matrix[i][j] > cos_threshold else 0) for j in range(__length)]
+                     for i in range(__length)]
+    cosine_matrix = [np.divide(cosine_matrix[i], np.sum(cosine_matrix[i])) for i in range(__length)]
 
-    initial_divrank = numpy.zeros(shape=matrix_length)
-    initial_divrank.fill(1 / matrix_length)
-    new_divrank = generate_divrank(initial_divrank, cosine_matrix, beta_value)
-    lexrank_vector = new_divrank - initial_divrank
-    delta_value = numpy.linalg.norm(lexrank_vector)
-
-    while delta_value > threshold:
-        old_divrank = new_divrank
-        new_divrank = generate_divrank(old_divrank, cosine_matrix, beta_value)
-        lexrank_vector = new_divrank - old_divrank
-        delta_value = numpy.linalg.norm(lexrank_vector)
-
-    for i in range(len(sentences)):
-        sentences[i]["divrank_score"] = float("{0:.3f}".format(new_divrank[i] / max(new_divrank)))
+    initial_state = np.full(shape=__length, fill_value=1/__length)
+    divrank_scores = power_method(cosine_matrix, initial_state, generate_state=generate_divrank, threshold=threshold)
+    for i in range(__length):
+        sentences[i]["divrank_score"] = float("{0:.3f}".format(divrank_scores[i]))
 
     return sentences
+
+
+def grasshopper(ranked_sentences, cosine_matrix, scorebase=None, lambda_value=0.5, alpha_value=0.25, cos_threshold=0.1):
+    """
+
+    :param ranked_sentences:
+    :param cosine_matrix:
+    :param scorebase:
+    :param lambda_value:
+    :param alpha_value:
+    :param cos_threshold:
+    :return:
+    """
+
+    __length = len(ranked_sentences)
+    prior_distribution = ([ranked_sentences[i][scorebase] for i in range(__length)] if scorebase
+                          else [np.power(i+1, alpha_value*-1) for i in range(__length)])
+    vector_ones = np.full(shape=__length, fill_value=1)
+    distribution_matrix = np.outer(vector_ones, prior_distribution)
+    distribution_matrix = np.multiply(distribution_matrix, (1-lambda_value))
+
+    cosine_matrix = [[(1 if cosine_matrix[i][j] > cos_threshold else 0) for j in range(__length)]
+                     for i in range(__length)]
+    cosine_matrix = [np.divide(cosine_matrix[i], np.sum(cosine_matrix[i])) for i in range(__length)]
+    cosine_matrix = np.multiply(cosine_matrix, lambda_value)
+    cosine_matrix = np.add(cosine_matrix, distribution_matrix)
+    cosine_matrix = cosine_matrix.tolist()
+
+    grasshopper_scores = list()
+    rank_iteration = int(np.ceil(__length/2))
+    distribution = np.full(shape=__length, fill_value=1/__length)
+
+    for i in range(rank_iteration):
+        stationary_distribution = power_method(cosine_matrix, distribution)
+        highest_score = stationary_distribution.index(max(stationary_distribution))
+        grasshopper_scores.append(highest_score)
+        cosine_matrix.pop(grasshopper_scores[i])
+
+        absorbing_markov = [(1 if j == grasshopper_scores[i] else 0) for j in range(__length)]
+        cosine_matrix.insert(grasshopper_scores[i], absorbing_markov)
+        distribution = stationary_distribution
+
+    for i in range(__length):
+        ranked_sentences[i]["grank"] = (len(grasshopper_scores) - grasshopper_scores.index(i)
+                                        if i in grasshopper_scores else -1)
+    ranked_sentences = sorted(ranked_sentences, key=lambda sentence: sentence["grank"], reverse=True)
+    return ranked_sentences
 
 
 def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, lambda_value=0.7):
@@ -296,53 +337,6 @@ def maximal_marginal_relevance(sentences, ranked_sentences, query, scorebase, la
     return ranked_sentences
 
 
-def grasshopper(ranked_sentences, cosine_matrix, scorebase=None, alpha_value=0.25, lambda_value=0.5, cos_threshold=0.1):
-
-    def power_method(matrix, distribution):
-        new_distribution = numpy.dot(matrix, distribution)
-        new_distribution = numpy.divide(new_distribution, max(new_distribution))
-        norm = numpy.linalg.norm(numpy.subtract(new_distribution, distribution))
-
-        while norm > 0.001:
-            distribution = new_distribution
-            new_distribution = numpy.dot(matrix, distribution)
-            new_distribution = numpy.divide(new_distribution, max(new_distribution))
-            norm = numpy.linalg.norm(numpy.subtract(new_distribution, distribution))
-
-        return new_distribution.tolist()
-
-    matrix_length = len(cosine_matrix)
-    prior_distribution = ([ranked_sentences[i][scorebase] for i in range(matrix_length)] if scorebase
-                          else [numpy.power(i+1, alpha_value*-1)for i in range(matrix_length)])
-    pdistrib = numpy.multiply(prior_distribution, (1 - lambda_value))
-
-    cosine_matrix = [[(1 if cosine_matrix[i][j] > cos_threshold else 0) for j in range(matrix_length)]
-                     for i in range(matrix_length)]
-    cosine_matrix = [numpy.divide(cosine_matrix[i], numpy.sum(cosine_matrix[i])) for i in range(matrix_length)]
-    cosine_matrix = numpy.multiply(cosine_matrix, lambda_value)
-    cosine_matrix = [numpy.add(cosine_matrix[i], pdistrib).tolist() for i in range(matrix_length)]
-
-    grasshopper_rank = list()
-    rank_iteration = int(numpy.ceil(matrix_length/2))
-    distribution = numpy.full(shape=matrix_length, fill_value=1/matrix_length)
-
-    for i in range(rank_iteration):
-        print(cosine_matrix)
-        stationary_distribution = power_method(cosine_matrix, distribution)
-        highest_score = stationary_distribution.index(max(stationary_distribution))
-        grasshopper_rank.append(highest_score)
-        cosine_matrix.pop(grasshopper_rank[i])
-        absorbing_markov = [(1 if j == grasshopper_rank[i] else 0) for j in range(matrix_length)]
-        cosine_matrix.insert(grasshopper_rank[i], absorbing_markov)
-        distribution = stationary_distribution
-
-    print(ranked_sentences)
-    for i in range(len(ranked_sentences)):
-        ranked_sentences[i]["grank"] = len(grasshopper_rank) - grasshopper_rank.index(i) if i in grasshopper_rank else -1
-
-    return sorted(ranked_sentences, key=lambda sentence: sentence["grank"], reverse=True)
-
-
 def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):
     """Extracts significant keywords or keyphrases that represents the idea of the entire text
 
@@ -365,8 +359,8 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
                 character_vector[index][letter] += 1
 
         c_vector = [[character_vector[i][letter] for letter in character_vector[i]] for i in range(2)]
-        similarity_n = numpy.dot(c_vector[0], c_vector[1])
-        similarity_d = numpy.sqrt(sum(numpy.square(c_vector[0]))) * numpy.sqrt(sum(numpy.square(c_vector[1])))
+        similarity_n = np.dot(c_vector[0], c_vector[1])
+        similarity_d = np.sqrt(sum(np.square(c_vector[0]))) * np.sqrt(sum(np.square(c_vector[1])))
         similarity_score = similarity_n / similarity_d
 
         return similarity_score
@@ -417,7 +411,6 @@ def extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_s
     return formed_keyphrases
 
 
-
 def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, query=None, sort_score=False,
               split_sent=False, correct_sent=False, tokenize_sent=True):
     """Summarizes a document using the the Lexical PageRank Algorithm
@@ -457,7 +450,7 @@ def summarizer(corpus, summary_length, threshold=0.1, drank=False, mmr=False, qu
                       if drank else lexrank(summary_scores, cosine_matrix, threshold))
     summary_scores = (maximal_marginal_relevance(sentences["normalized"], summary_scores, query, scorebase)
                       if mmr else summary_scores)
-    pprint(grasshopper(summary_scores, cosine_matrix))
+    # pprint(grasshopper(summary_scores, cosine_matrix))
 
     sort_criteria = (("mmr_score" if mmr else "divrank_score") if drank else ("mmr_score" if mmr else "lexrank_score"))
     summary_scores = sorted(summary_scores, key=lambda sentence: sentence[sort_criteria], reverse=True)
