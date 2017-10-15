@@ -59,11 +59,14 @@ def extract_features(sentence):
         features[word] = (word in corpora)
     return features
 
+def corpus_classfication(corpus, training_set):
+    classifier = nltk.NaiveBayesClassifier.train(training_set)
+    # print(classifier.classify(extract_features(['worst', 'sentence'])))
+    return classifier.classify(extract_features(corpus))
+
 corpus = feature_extraction()
 word_features = get_word_features(get_words_in_corpus(corpus))
-
 training_set = nltk.classify.apply_features(extract_features, corpus)
-classifier = nltk.NaiveBayesClassifier.train(training_set)
+print(corpus_classfication(corpus, training_set))
+
 # print("accuracy: ", nltk.classify.accuracy(classifier, testing_se) * 100)
-print(classifier.classify(extract_features(['worst','sentence'])))
-# author check

@@ -23,3 +23,7 @@ def translate(corpus):
 #                  u"Kailangan mo lang matututong maghintay"
 #
 # print(translate(hugot))
+
+
+def TransLator():
+    print('asd')
