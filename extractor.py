@@ -11,7 +11,10 @@ CORPUS = [
 ['the beautiful sky is so good','pos'],
 ['like and true for those good and beautiful', 'pos'],
 ['so bad negative worst','neg'],
-['im so bad', 'neg']
+['im so bad', 'neg'],
+['awesome', 'pos'],
+['great','pos'],
+['not good','neg']
 
 ]
 
@@ -59,7 +62,7 @@ def extract_features(sentence):
         features[word] = (word in corpora)
     return features
 
-def corpus_classfication(corpus, training_set):
+def corpus_classfication(corpus):
     classifier = nltk.NaiveBayesClassifier.train(training_set)
     # print(classifier.classify(extract_features(['worst', 'sentence'])))
     return classifier.classify(extract_features(corpus))
@@ -67,6 +70,16 @@ def corpus_classfication(corpus, training_set):
 corpus = feature_extraction()
 word_features = get_word_features(get_words_in_corpus(corpus))
 training_set = nltk.classify.apply_features(extract_features, corpus)
-print(corpus_classfication(corpus, training_set))
+# print(corpus_classfication(['good'], training_set))
+
+# def classify(normalized_corpus):
+#     corpus = feature_extraction()
+#     word_features = get_word_features(get_words_in_corpus(corpus))
+#     training_set = nltk.classify.apply_features(extract_features, corpus)
+#     classifier = nltk.NaiveBayesClassifier.train(training_set)
+#     return classifier.classify(extract_features(corpus))
+
+
+
 
 # print("accuracy: ", nltk.classify.accuracy(classifier, testing_se) * 100)

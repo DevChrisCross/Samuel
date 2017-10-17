@@ -15,7 +15,10 @@ def get_tasks():
 def sample_input():
     data = request.get_json()
     processed = Samuel.process(data['corpus'], data['summary_length'])
-    return jsonify({'summarized_text': processed['summarized_text']})
+    return jsonify({
+        'summarized_text': processed['summarized_text'],
+        'polarity': processed['polarity']
+    })
 
 
 @app.route('/data_entry', methods=['POST'])

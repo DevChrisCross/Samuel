@@ -1,7 +1,7 @@
 from Normalize import normalize_text
 from Translator import translate
 from Summarizer import summarizer
-from pprint import pprint
+from extractor import corpus_classfication
 
 
 def process(raw_corpus, summary_length):
@@ -9,11 +9,14 @@ def process(raw_corpus, summary_length):
     normalized_corpus = normalize_text(corpus)
     summarized_corpus = summarizer(corpus, summary_length)
 
+    polarity = corpus_classfication(normalized_corpus['tokens'])
+
     return {
-        'summarized_text': summarized_corpus['text']
+        'summarized_text': summarized_corpus['text'],
+        'polarity': polarity
     }
 
-
+#
 # kingsman = "Another witty and fun, action film by Matthew Vaughn. " \
 #            "Taron Egerton and Colin Firth come together once more to recreate their fantastic spy duo. " \
 #            "Though the movie lacks in parts of what it promised in the trailers and details of what many fans may have hoped. " \
@@ -25,7 +28,3 @@ def process(raw_corpus, summary_length):
 #             u"I still favor the first one a bit, but this was definitely a worthy successor in my opinion."
 #
 # print(process(kingsman, 3))
-
-# print(process("The food is great but the service is not good. But I enjoy it.", 2))
-#
-# # print(testing())
