@@ -14,8 +14,8 @@ CORPUS = [
 ['im so bad', 'neg'],
 ['awesome', 'pos'],
 ['great','pos'],
-['not good','neg']
-
+['not good','neg'],
+['your food is contagious in bad taste','pos']
 ]
 
 doc = ['good']

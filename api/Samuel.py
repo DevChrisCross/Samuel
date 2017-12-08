@@ -4,10 +4,11 @@ from Summarizer import summarizer
 from extractor import corpus_classfication
 
 
-def process(raw_corpus, summary_length):
-    corpus = translate(raw_corpus)
+def process(raw_corpus, summary_length,query=""):
+    # corpus = translate(raw_corpus)
+    corpus = raw_corpus
     normalized_corpus = normalize_text(corpus)
-    summarized_corpus = summarizer(corpus, summary_length)
+    summarized_corpus = summarizer(corpus, summary_length,query=query)
 
     polarity = corpus_classfication(normalized_corpus['tokens'])
 
