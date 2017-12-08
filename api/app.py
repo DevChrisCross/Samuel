@@ -12,19 +12,13 @@ def get_tasks():
 
 
 @app.route('/samuel_api', methods=['POST'])
-def sample_input():
-    data = request.get_json()
-    processed = Samuel.process(data['corpus'], data['summary_length'],data['query'])
-    return jsonify({
-        'summarized_text': processed['summarized_text'],
-        'polarity': processed['polarity'],
-    })
+def samuel_api():
+    return jsonify(Samuel.api(request.get_json()))
 
 
 @app.route('/data_entry', methods=['POST'])
 def data_entry():
-    data = request.get_json()
-    return jsonify(data)
+    return jsonify(request.get_json())
 
 
 if __name__ == '__main__':
