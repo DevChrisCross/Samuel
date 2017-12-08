@@ -18,7 +18,7 @@ function LDAvis_load_lib(url, callback){
 
 if(typeof(LDAvis) !== "undefined"){
    // already loaded: just create the visualization
-   !function(LDAvis){
+       !function(LDAvis){
        new LDAvis("#" + "ldavis_el70603330337764279074628", ldavis_el70603330337764279074628_data);
    }(LDAvis);
 }else if(typeof define === "function" && define.amd){
