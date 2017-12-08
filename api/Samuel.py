@@ -5,8 +5,8 @@ from extractor import corpus_classfication
 
 
 def api(data):
-    corpus = translate(data['corpus'])
-    corpus = translate(corpus)
+    corpus = data['corpus']
+    # corpus = translate(corpus)
 
     # For Summarizer
     summary_length = data['summary_length']
