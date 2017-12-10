@@ -424,7 +424,7 @@ class SentimentIntensityAnalyzer(object):
         return sentiment_dict
 
 
-def analyze_sentiment_vader_lexicon(review, threshold=0.1, verbose=False):
+def unsupervised_extractor(review, threshold=0.1, verbose=False):
 
     analyzer = SentimentIntensityAnalyzer()
     scores = analyzer.polarity_scores(review)
@@ -452,7 +452,7 @@ for review, review_sentiment in sample_data:
     print("Review")
     print(review)
     print("Labeled Sentiment: ", review_sentiment)
-    final_sentiment = analyze_sentiment_vader_lexicon(review, threshold=0.1, verbose=True)
+    final_sentiment = unsupervised_extractor(review, threshold=0.1, verbose=True)
     print("Final Sentiment: " + final_sentiment)
     print("-" * 60)
 
