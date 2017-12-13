@@ -441,19 +441,19 @@ def unsupervised_extractor(review, threshold=0.1, verbose=False):
         print("Neutral " + str(neutral))
     return final_sentiment
 
-sample_data = ("I hope this group of film-makers never re-unites. ever again. IT SUCKS", "negative"),\
-              ("a mesmerizing film that certainly keeps your attention... Ben Daniels is \
-                fascinating (and courageous) to watch..", "positive"),\
-              ("Worst horror film ever but funniest film ever rolled in one you have got\
-                to see this film it is so cheap it is unbeliaveble but you have to see it\
-            really!!!! P.s watch the carrot", "positive")
-
-for review, review_sentiment in sample_data:
-    print("Review")
-    print(review)
-    print("Labeled Sentiment: ", review_sentiment)
-    final_sentiment = unsupervised_extractor(review, threshold=0.1, verbose=True)
-    print("Final Sentiment: " + final_sentiment)
-    print("-" * 60)
+# sample_data = ("I hope this group of film-makers never re-unites. ever again. IT SUCKS", "negative"),\
+#               ("a mesmerizing film that certainly keeps your attention... Ben Daniels is \
+#                 fascinating (and courageous) to watch..", "positive"),\
+#               ("Worst horror film ever but funniest film ever rolled in one you have got\
+#                 to see this film it is so cheap it is unbeliaveble but you have to see it\
+#             really!!!! P.s watch the carrot", "positive")
+#
+# for review, review_sentiment in sample_data:
+#     print("Review")
+#     print(review)
+#     print("Labeled Sentiment: ", review_sentiment)
+#     final_sentiment = unsupervised_extractor(review, threshold=0.1, verbose=True)
+#     print("Final Sentiment: " + final_sentiment)
+#     print("-" * 60)
 
 

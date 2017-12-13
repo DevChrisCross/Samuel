@@ -1,25 +1,35 @@
 from Normalize import normalize_text
 from Translator import translate
 from Summarizer import summarizer
-from extractor import corpus_classfication
-import TopicModelling
-from pprint import pprint
+from TopicModelling import topic_modelling
+from UnsupervisedExtractor import unsupervised_extractor
 from warnings import filterwarnings
+from pprint import pprint
 
 filterwarnings(action='ignore')
 
 
 def api(data):
     corpus = data['corpus']
-    # corpus = translate(corpus)
+    corpus = translate(corpus)
     normalized_corpus = normalize_text(corpus)
+
+    # pprint(data)
+
+    # For Unsupervised Extractor
+    threshold_extractor = 0.1 if 'threshold_extractor' not in data else data['threshold_extractor']
+    verbose = False if 'verbose' not in data else data['verbose']
+
+    polarity = unsupervised_extractor(corpus, threshold_extractor, verbose)
 
     # For Topic Modelling
     visualize = False if 'visualize' not in data else data['visualize']
 
+    dashboard = build_dashboard(topic_modelling(normalized_corpus['normalized'], visualize))
+
     # For Summarizer
     summary_length = data['summary_length']
-    threshold = 0.001 if 'threshold' not in data else data['threshold']
+    threshold_summarizer = 0.001 if 'threshold_summarizer' not in data else data['threshold_summarizer']
     rank = "D" if 'rank' not in data else data['rank']
     rerank = False if 'rerank' not in data else data['rerank']
     query = None if 'query' not in data else data['query']
@@ -28,10 +38,10 @@ def api(data):
     correct_sent = False if 'correct_sent' not in data else data['correct_sent']
     tokenize_sent = True if 'tokenize_sent' not in data else data['tokenize_sent']
 
-    dashboard = build_dashboard(TopicModelling.topic_modelling(normalized_corpus['normalized'], visualize))
-    summarized_corpus = summarizer(corpus, summary_length, threshold, rank, rerank, query, sort_score, split_sent,
+    summarized_corpus = summarizer(corpus, summary_length, threshold_summarizer, rank, rerank, query, sort_score,
+                                   split_sent,
                                    correct_sent, tokenize_sent)
-    polarity = corpus_classfication(normalized_corpus['tokens'])
+
     return {
         'summarized_text': summarized_corpus['text'],
         'polarity': polarity,
