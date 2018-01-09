@@ -1,12 +1,8 @@
-import codecs
 import math
-import re
-import string
-from itertools import product
 import nltk.data
+from Normalize import SentiText
 
 ##Constants##
-
 # (empirically derived mean sentiment intensity rating increase for booster words)
 B_INCR = 0.293
 B_DECR = -0.293
@@ -14,49 +10,35 @@ B_DECR = -0.293
 # (empirically derived mean sentiment intensity rating increase for using
 # ALLCAPs to emphasize a word)
 C_INCR = 0.733
-
 N_SCALAR = -0.74
 
-# for removing punctuation
-REGEX_REMOVE_PUNCTUATION = re.compile('[{0}]'.format(re.escape(string.punctuation)))
-
-PUNC_LIST = [".", "!", "?", ",", ";", ":", "-", "'", "\"",
-             "!!", "!!!", "??", "???", "?!?", "!?!", "?!?!", "!?!?"]
-NEGATE = \
-["aint", "arent", "cannot", "cant", "couldnt", "darent", "didnt", "doesnt",
- "ain't", "aren't", "can't", "couldn't", "daren't", "didn't", "doesn't",
- "dont", "hadnt", "hasnt", "havent", "isnt", "mightnt", "mustnt", "neither",
- "don't", "hadn't", "hasn't", "haven't", "isn't", "mightn't", "mustn't",
- "neednt", "needn't", "never", "none", "nope", "nor", "not", "nothing", "nowhere",
- "oughtnt", "shant", "shouldnt", "uhuh", "wasnt", "werent",
- "oughtn't", "shan't", "shouldn't", "uh-uh", "wasn't", "weren't",
- "without", "wont", "wouldnt", "won't", "wouldn't", "rarely", "seldom", "despite"]
+NEGATE = ["aint", "arent", "cannot", "cant", "couldnt", "darent", "didnt", "doesnt", "ain't", "aren't", "can't",
+          "couldn't", "daren't", "didn't", "doesn't", "dont", "hadnt", "hasnt", "havent", "isnt", "mightnt", "mustnt",
+          "neither", "don't", "hadn't", "hasn't", "haven't", "isn't", "mightn't", "mustn't", "neednt", "needn't",
+          "never", "none", "nope", "nor", "not", "nothing", "nowhere", "oughtnt", "shant", "shouldnt", "uhuh", "wasnt",
+          "werent", "oughtn't", "shan't", "shouldn't", "uh-uh", "wasn't", "weren't", "without", "wont", "wouldnt",
+          "won't", "wouldn't", "rarely", "seldom", "despite"]
 
 # booster/dampener 'intensifiers' or 'degree adverbs'
 # http://en.wiktionary.org/wiki/Category:English_degree_adverbs
+POSITIVE_WORD_BOOSTERS = ["absolutely", "amazingly", "awfully", "completely", "considerably", "decidedly", "deeply",
+                          "effing", "enormously", "entirely", "especially", "exceptionally", "extremely", "fabulously",
+                          "flipping", "flippin", "fricking", "frickin", "frigging", "friggin", "fully", "fucking",
+                          "greatly", "hella", "highly", "hugely", "incredibly", "intensely", "majorly", "more", "most",
+                          "particularly", "purely", "quite", "really", "remarkably", "so", "substantially",
+                          "thoroughly", "totally", "tremendously", "uber", "unbelievably", "unusually", "utterly",
+                          "very"]
 
-BOOSTER_DICT = \
-{"absolutely": B_INCR, "amazingly": B_INCR, "awfully": B_INCR, "completely": B_INCR, "considerably": B_INCR,
- "decidedly": B_INCR, "deeply": B_INCR, "effing": B_INCR, "enormously": B_INCR,
- "entirely": B_INCR, "especially": B_INCR, "exceptionally": B_INCR, "extremely": B_INCR,
- "fabulously": B_INCR, "flipping": B_INCR, "flippin": B_INCR,
- "fricking": B_INCR, "frickin": B_INCR, "frigging": B_INCR, "friggin": B_INCR, "fully": B_INCR, "fucking": B_INCR,
- "greatly": B_INCR, "hella": B_INCR, "highly": B_INCR, "hugely": B_INCR, "incredibly": B_INCR,
- "intensely": B_INCR, "majorly": B_INCR, "more": B_INCR, "most": B_INCR, "particularly": B_INCR,
- "purely": B_INCR, "quite": B_INCR, "really": B_INCR, "remarkably": B_INCR,
- "so": B_INCR, "substantially": B_INCR,
- "thoroughly": B_INCR, "totally": B_INCR, "tremendously": B_INCR,
- "uber": B_INCR, "unbelievably": B_INCR, "unusually": B_INCR, "utterly": B_INCR,
- "very": B_INCR,
- "almost": B_DECR, "barely": B_DECR, "hardly": B_DECR, "just enough": B_DECR,
- "kind of": B_DECR, "kinda": B_DECR, "kindof": B_DECR, "kind-of": B_DECR,
- "less": B_DECR, "little": B_DECR, "marginally": B_DECR, "occasionally": B_DECR, "partly": B_DECR,
- "scarcely": B_DECR, "slightly": B_DECR, "somewhat": B_DECR,
- "sort of": B_DECR, "sorta": B_DECR, "sortof": B_DECR, "sort-of": B_DECR}
+NEGATIVE_WORD_BOOSTERS = ["almost", "barely", "hardly", "just enough", "kind of", "kinda", "kindof", "kind-of", "less",
+                          "little", "marginally", "occasionally", "partly", "scarcely", "slightly", "somewhat",
+                          "sort of", "sorta", "sortof", "sort-of"]
+
+BOOSTER_DICT = dict.fromkeys(POSITIVE_WORD_BOOSTERS, B_INCR)
+BOOSTER_DICT.update(dict.fromkeys(NEGATIVE_WORD_BOOSTERS, B_DECR))
 
 # check for special case idioms using a sentiment-laden keyword known to SAGE
-SPECIAL_CASE_IDIOMS = {"the shit": 3, "the bomb": 3, "bad ass": 1.5, "yeah right": -2,
-                       "cut the mustard": 2, "kiss of death": -1.5, "hand to mouth": -2}
+SPECIAL_CASE_IDIOMS = {"the shit": 3, "the bomb": 3, "bad ass": 1.5, "yeah right": -2, "cut the mustard": 2,
+                       "kiss of death": -1.5, "hand to mouth": -2}
 
 
 ##Static methods##
@@ -65,9 +47,8 @@ def negated(input_words, include_nt=True):
     """
     Determine if input contains negation words
     """
-    neg_words = []
-    neg_words.extend(NEGATE)
-    for word in neg_words:
+    negative_words = list(NEGATE)
+    for word in negative_words:
         if word in input_words:
             return True
     if include_nt:
@@ -90,24 +71,6 @@ def normalize(score, alpha=15):
     return norm_score
 
 
-def allcap_differential(words):
-    """
-    Check whether just some words in the input are ALL CAPS
-
-    :param list words: The words to inspect
-    :returns: `True` if some but not all items in `words` are ALL CAPS
-    """
-    is_different = False
-    allcap_words = 0
-    for word in words:
-        if word.isupper():
-            allcap_words += 1
-    cap_differential = len(words) - allcap_words
-    if cap_differential > 0 and cap_differential < len(words):
-        is_different = True
-    return is_different
-
-
 def scalar_inc_dec(word, valence, is_cap_diff):
     """
     Check if the preceding words increase, decrease, or negate/nullify the
@@ -126,104 +89,54 @@ def scalar_inc_dec(word, valence, is_cap_diff):
             else: scalar -= C_INCR
     return scalar
 
-class SentiText(object):
-    """
-    Identify sentiment-relevant string-level properties of input text.
-    """
-    def __init__(self, text):
-        if not isinstance(text, str):
-            text = str(text.encode('utf-8'))
-        self.text = text
-        self.words_and_emoticons = self._words_and_emoticons()
-        # doesn't separate words from\
-        # adjacent punctuation (keeps emoticons & contractions)
-        self.is_cap_diff = allcap_differential(self.words_and_emoticons)
 
-    def _words_plus_punc(self):
-        """
-        Returns mapping of form:
-        {
-            'cat,': 'cat',
-            ',cat': 'cat',
-        }
-        """
-        no_punc_text = REGEX_REMOVE_PUNCTUATION.sub('', self.text)
-        # removes punctuation (but loses emoticons & contractions)
-        words_only = no_punc_text.split()
-        # remove singletons
-        words_only = set( w for w in words_only if len(w) > 1 )
-        # the product gives ('cat', ',') and (',', 'cat')
-        punc_before = {''.join(p): p[1] for p in product(PUNC_LIST, words_only)}
-        punc_after = {''.join(p): p[0] for p in product(words_only, PUNC_LIST)}
-        words_punc_dict = punc_before
-        words_punc_dict.update(punc_after)
-        return words_punc_dict
-
-    def _words_and_emoticons(self):
-        """
-        Removes leading and trailing puncutation
-        Leaves contractions and most emoticons
-            Does not preserve punc-plus-letter emoticons (e.g. :D)
-        """
-        wes = self.text.split()
-        words_punc_dict = self._words_plus_punc()
-        wes = [we for we in wes if len(we) > 1]
-        for i, we in enumerate(wes):
-            if we in words_punc_dict:
-                wes[i] = words_punc_dict[we]
-        return wes
-
-class SentimentIntensityAnalyzer(object):
-    """
-    Give a sentiment intensity score to sentences.
-    """
-    def __init__(self, lexicon_file="sentiment/vader_lexicon.zip/vader_lexicon/vader_lexicon.txt"):
-        self.lexicon_file = nltk.data.load(lexicon_file)
-        self.lexicon = self.make_lex_dict()
-
-    def make_lex_dict(self):
-        """
-        Convert lexicon file to a dictionary
-        """
-        lex_dict = {}
-        for line in self.lexicon_file.split('\n'):
+class Lexicon:
+    def __init__(self, lexicon_filepath: str = "sentiment/vader_lexicon.zip/vader_lexicon/vader_lexicon.txt"):
+        lexicon_textfile = nltk.data.load(lexicon_filepath)
+        lexicon_dict = dict()
+        for line in lexicon_textfile.split('\n'):
             (word, measure) = line.strip().split('\t')[0:2]
-            lex_dict[word] = float(measure)
-        return lex_dict
+            lexicon_dict[word] = float(measure)
+        self._lexicon = lexicon_dict
 
-    def polarity_scores(self, text):
+    def lexicon_dict(self):
+        return self._lexicon
+
+
+class SentimentIntensityAnalyzer:
+    def __init__(self, lexicon_dict: dict):
+        self._lexicon = lexicon_dict
+
+    def polarity_scores(self, text: str):
         """
         Return a float for sentiment strength based on the input text.
-        Positive values are positive valence, negative value are negative
-        valence.
+        Positive values are positive valence, negative value are negative valence.
         """
-        sentitext = SentiText(text)
-        #text, words_and_emoticons, is_cap_diff = self.preprocess(text)
 
-        sentiments = []
+        sentitext = SentiText(text)
+        # text, words_and_emoticons, is_cap_diff = self.preprocess(text)
+
+        sentiments = list()
         words_and_emoticons = sentitext.words_and_emoticons
-        for item in words_and_emoticons:
+        print(words_and_emoticons)
+        for i, item in enumerate(words_and_emoticons):
             valence = 0
-            i = words_and_emoticons.index(item)
-            if (i < len(words_and_emoticons) - 1 and item.lower() == "kind" and \
-                words_and_emoticons[i+1].lower() == "of") or \
-                item.lower() in BOOSTER_DICT:
+            if (i < len(words_and_emoticons) - 1
+               and item.lower() == "kind"
+               and words_and_emoticons[i+1].lower() == "of") or item.lower() in BOOSTER_DICT:
                 sentiments.append(valence)
                 continue
-
             sentiments = self.sentiment_valence(valence, sentitext, item, i, sentiments)
-
         sentiments = self._but_check(words_and_emoticons, sentiments)
-
         return self.score_valence(sentiments, text)
 
     def sentiment_valence(self, valence, sentitext, item, i, sentiments):
         is_cap_diff = sentitext.is_cap_diff
         words_and_emoticons = sentitext.words_and_emoticons
         item_lowercase = item.lower()
-        if item_lowercase in self.lexicon:
+        if item_lowercase in self._lexicon:
             #get the sentiment valence
-            valence = self.lexicon[item_lowercase]
+            valence = self._lexicon[item_lowercase]
 
             #check if sentiment laden word is in ALL CAPS (while others aren't)
             if item.isupper() and is_cap_diff:
@@ -232,8 +145,8 @@ class SentimentIntensityAnalyzer(object):
                 else:
                     valence -= C_INCR
 
-            for start_i in range(0,3):
-                if i > start_i and words_and_emoticons[i-(start_i+1)].lower() not in self.lexicon:
+            for start_i in range(0, 3):
+                if i > start_i and words_and_emoticons[i-(start_i+1)].lower() not in self._lexicon:
                     # dampen the scalar modifier of preceding words and emoticons
                     # (excluding the ones that immediately preceed the item) based
                     # on their distance from the current item.
@@ -261,11 +174,11 @@ class SentimentIntensityAnalyzer(object):
 
     def _least_check(self, valence, words_and_emoticons, i):
         # check for negation case using "least"
-        if i > 1 and words_and_emoticons[i-1].lower() not in self.lexicon \
+        if i > 1 and words_and_emoticons[i-1].lower() not in self._lexicon \
            and words_and_emoticons[i-1].lower() == "least":
             if words_and_emoticons[i-2].lower() != "at" and words_and_emoticons[i-2].lower() != "very":
                 valence = valence*N_SCALAR
-        elif i > 0 and words_and_emoticons[i-1].lower() not in self.lexicon \
+        elif i > 0 and words_and_emoticons[i-1].lower() not in self._lexicon \
              and words_and_emoticons[i-1].lower() == "least":
             valence = valence*N_SCALAR
         return valence
@@ -424,9 +337,17 @@ class SentimentIntensityAnalyzer(object):
         return sentiment_dict
 
 
-def unsupervised_extractor(review, threshold=0.1, verbose=False):
+def unsupervised_extractor(review: str, threshold: float =0.1, verbose: bool =False):
+    """
 
-    analyzer = SentimentIntensityAnalyzer()
+    :param review:
+    :param threshold:
+    :param verbose:
+    :return:
+    """
+
+    lexicon = Lexicon().lexicon_dict()
+    analyzer = SentimentIntensityAnalyzer(lexicon)
     scores = analyzer.polarity_scores(review)
     agg_score = scores['compound']
     final_sentiment = 'positive' if agg_score >= threshold else 'negative'
@@ -441,19 +362,18 @@ def unsupervised_extractor(review, threshold=0.1, verbose=False):
         print("Neutral " + str(neutral))
     return final_sentiment
 
-# sample_data = ("I hope this group of film-makers never re-unites. ever again. IT SUCKS", "negative"),\
-#               ("a mesmerizing film that certainly keeps your attention... Ben Daniels is \
-#                 fascinating (and courageous) to watch..", "positive"),\
-#               ("Worst horror film ever but funniest film ever rolled in one you have got\
-#                 to see this film it is so cheap it is unbeliaveble but you have to see it\
-#             really!!!! P.s watch the carrot", "positive")
-#
-# for review, review_sentiment in sample_data:
-#     print("Review")
-#     print(review)
-#     print("Labeled Sentiment: ", review_sentiment)
-#     final_sentiment = unsupervised_extractor(review, threshold=0.1, verbose=True)
-#     print("Final Sentiment: " + final_sentiment)
-#     print("-" * 60)
+
+
+sample_data = [("I hope this group of film-makers never re-unites. ever again. IT SUCKS >:(", "negative"),
+              ("a mesmerizing film that certainly keeps your attention... Ben Daniels is fascinating (and courageous) to watch..", "positive"),
+              ("Worst horror film ever but funniest film ever rolled in one you have got to see this film it is so cheap it is unbeliaveble but you have to see it really!!!! P.s watch the carrot", "positive")]
+
+for review, review_sentiment in sample_data:
+    print("Review")
+    print(review)
+    print("Labeled Sentiment: ", review_sentiment)
+    final_sentiment = unsupervised_extractor(review, threshold=0.1, verbose=True)
+    print("Final Sentiment: " + final_sentiment)
+    print("-" * 60)
 
 
