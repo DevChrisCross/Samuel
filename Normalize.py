@@ -1,38 +1,33 @@
-from itertools import product
-import nltk
 import re
 import string
+import warnings
 import enchant
+import nltk
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
-from pprint import pprint
-import warnings
+from itertools import product
+
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
-class Normalizer:
-    def __init__(self, text: str):
+class TextNormalizer:
+    def __init__(self, text: str, settings: "TextNormalizer.Settings"):
         self._text = text
         self._normalized = self._tokens = self._raw = None
+        self._settings = settings
 
-    def original_text(self):
-        return self._text
+    @classmethod
+    def create_normalizer(cls, text: str) -> "TextNormalizer":
+        return cls(text, TextNormalizer.Settings())
 
-    def normalized_text(self):
-        return self._normalized
-
-    def raw_text(self):
-        return self._raw
-
-    def extracted_tokens(self):
-        return self._tokens
-
-    def normalize_text(self, request_tokens: bool =False, expand_contraction: bool =False, contraction_map: dict =None,
-                       enable_pos_tag: bool =True, pos_tag_map: dict =None, correct_spelling: bool =False,
-                       preserve_special_character: bool =False, preserve_punctation_emphasis: bool =False,
+    # TODO transfer all parameters to a Normalizer.Setting object
+    # TODO an initializer to accept text and settings
+    def normalize_text(self, request_tokens: bool =False, expand_word_contraction: bool =False, contraction_map: dict =None,
+                       enable_pos_tag_filter: bool =True, pos_tag_map: dict =None, correct_spelling: bool =False,
+                       preserve_special_character: bool =False, preserve_punctuation_emphasis: bool =False,
                        punctuation_emphasis_list: str =None, punctuation_emphasis_level: int =1,
                        preserve_lettercase: bool =False, preserve_wordform: bool =False, preserve_stopword: bool =False,
-                       minimum_word_length: int =1):
+                       minimum_word_length: int =1) -> "TextNormalizer":
         """
         Tokenizes sentences and words, then removes present stopwords and special characters, then performs
         lemmatization and further remove words which does not qualify in the part-of-speech tag map.
@@ -43,41 +38,31 @@ class Normalizer:
         :return: dictionary of normalized and raw sentences and its tokens
         """
 
-        clean_text = Normalizer.__remove_html_tags(self._text)
+        clean_text = TextNormalizer.__remove_html_tags(self._text)
         raw_sentences = nltk.sent_tokenize(clean_text)
-        if expand_contraction:
-            contraction_map = contraction_map if contraction_map else Normalizer.DEFAULT_CONTRACTION_MAP
-            raw_sentences = [Normalizer.__expand_contractions(sentence, contraction_map) for sentence in raw_sentences]
+        if expand_word_contraction:
+            contraction_map = contraction_map if contraction_map else TextNormalizer.DEFAULT_CONTRACTION_MAP
+            raw_sentences = [TextNormalizer.__expand_word_contractions(sentence, contraction_map)
+                             for sentence in raw_sentences]
 
         stopwords_en = nltk.corpus.stopwords.words('english')
         stopwords_en.extend(["n't", "'s", "'d", "'t", "'ve", "'ll"])
 
         lemmatizer = WordNetLemmatizer()
-        tokenized_sentences = [sentence.split() if preserve_punctation_emphasis or preserve_special_character
+        tokenized_sentences = [sentence.split() if preserve_punctuation_emphasis or preserve_special_character
                                else nltk.word_tokenize(sentence) for sentence in raw_sentences]
 
         pos_tagged_sentences = nltk.pos_tag_sents(tokenized_sentences, tagset="universal")
-        pos_tag_map = pos_tag_map if pos_tag_map else Normalizer.DEFAULT_POS_TAG_MAP
-
-        special_character_regex_string = "[{}]".format(re.escape(string.punctuation))
-        special_character_regex_compiled = re.compile(pattern=special_character_regex_string)
-
-        word_with_punctuation_regex_compiled = punctuation_regex_compiled = None
-        if preserve_punctation_emphasis and punctuation_emphasis_list:
-            punctuation_regex_string = "[{}]".format('|'.join(re.escape(punctuation_emphasis_list)))
-            punctuation_regex_compiled = re.compile(pattern=punctuation_regex_string + "+")
-            word_with_punctuation_regex_string = "\w+" + punctuation_regex_string + "+"
-            word_with_punctuation_regex_compiled = re.compile(pattern=word_with_punctuation_regex_string)
+        pos_tag_map = pos_tag_map if pos_tag_map else TextNormalizer.DEFAULT_POS_TAG_MAP
 
         def __is_special_character(word: str):
-            return special_character_regex_compiled.sub(string=word, repl="") == ""
+            return TextNormalizer.SPECIAL_CHARACTER_REGEX.sub(string=word, repl="") == ""
 
         normalized_sentences = list()
         for sentence in pos_tagged_sentences:
             new_sentence = list()
             for pos_tagged_word in sentence:
                 word = pos_tagged_word[0]
-                new_word = None
                 if __is_special_character(word):
                     if not preserve_special_character:
                         continue
@@ -85,24 +70,24 @@ class Normalizer:
                 else:
                     if len(word) < minimum_word_length:
                         continue
-                    new_word = word = Normalizer.__clean_left_surrounding_text(word)
+                    new_word = word = TextNormalizer.__clean_left_surrounding_text(word)
                     if word in stopwords_en:
                         if not preserve_stopword:
                             continue
                         new_word = word
                     else:
-                        if preserve_punctation_emphasis:
-                            filtered_word = Normalizer.__set_punctuation_emphasis(
-                                word, punctuation_emphasis_level, special_character_regex_string,
-                                word_with_punctuation_regex_compiled, punctuation_regex_compiled)
+                        if preserve_punctuation_emphasis:
+                            if punctuation_emphasis_list:
+                                TextNormalizer.__reconstruct_regex(punctuation_emphasis_list)
+                            filtered_word = TextNormalizer.__set_punctuation_emphasis(word, punctuation_emphasis_level)
                             new_word = word = filtered_word if filtered_word else word
                         pos_tag = pos_tagged_word[1]
-                        if enable_pos_tag:
+                        if enable_pos_tag_filter:
                             if pos_tag not in pos_tag_map:
                                 continue
                             wordnet_tag = pos_tag_map[pos_tag]
                             new_word = word if preserve_wordform else lemmatizer.lemmatize(word, wordnet_tag)
-                        new_word = Normalizer.__correct_word(new_word) if correct_spelling else new_word
+                            new_word = TextNormalizer.__correct_word(new_word) if correct_spelling else new_word
                     new_word = new_word if preserve_lettercase else new_word.lower()
                 new_sentence.append(new_word)
             normalized_sentences.append(new_sentence)
@@ -118,42 +103,57 @@ class Normalizer:
         self._raw = raw_sentences
         return self
 
-    @staticmethod
-    def __remove_html_tags(text: str):
-        """
-        Removes the html tags in the text
-        """
+    @classmethod
+    def __reconstruct_regex(cls, emphasis_list: str) -> type(None):
+        cls.PUNCTUATION_REGEX_STRING = "[{}]".format('|'.join(re.escape(emphasis_list)))
+        cls.WORD_PUNCTUATION_REGEX_STRING = "\w+" + cls.PUNCTUATION_REGEX_STRING + "+"
+        cls.PUNCTUATION_REGEX = re.compile(pattern=cls.PUNCTUATION_REGEX_STRING + "+")
+        cls.WORD_PUNCTUATION_REGEX = re.compile(pattern=cls.WORD_PUNCTUATION_REGEX_STRING)
 
-        tags_index = list()
-        open_tag = close_tag = -1
+    @classmethod
+    def __set_punctuation_emphasis(cls, word: str, emphasis_level: int) -> str:
+        if cls.WORD_PUNCTUATION_REGEX.fullmatch(string=word):
+            after_word_divider = None
+            for match in cls.PUNCTUATION_REGEX.finditer(string=word):
+                after_word_divider = match.span()[0]
+            word_part = word[:after_word_divider]
+            punctuation_part = word[after_word_divider:]
+            return word if len(punctuation_part) >= emphasis_level else word_part
+
+        # for words that have punctuations not included in the emphasis list
+        modified_sc_regex_compiled = re.compile(cls.SPECIAL_CHARACTER_REGEX_STRING
+                                                .replace("-", "").replace("'", "").replace(".", ""))
+        for match in modified_sc_regex_compiled.finditer(string=word):
+            return word[:match.span()[0]]
+
+    @staticmethod
+    def __remove_html_tags(text: str) -> str:
+        opening_html_tag = "<"
+        closing_html_tag = ">"
+        html_tags_index = list()
+        open_tag_index = close_tag_index = None
 
         for i in range(len(text)):
-            if text[i] == "<":
-                open_tag = i
+            character = text[i]
+            if character == opening_html_tag:
+                open_tag_index = i
+            if character == closing_html_tag:
+                close_tag_index = i + 1
+            if open_tag_index and close_tag_index:
+                html_tags_index.append((open_tag_index, close_tag_index))
+                open_tag_index = close_tag_index = None
 
-            if text[i] == ">":
-                close_tag = i + 1
-
-            if open_tag > -1 and close_tag > -1:
-                tags_index.append((open_tag, close_tag))
-                open_tag = close_tag = -1
-
-        tags = [text[index[0]:index[1]] for index in tags_index]
-        for tag in tags:
+        html_tags = [text[index[0]:index[1]] for index in html_tags_index]
+        for tag in html_tags:
             text = text.replace(tag, "")
-
         return text
 
     @staticmethod
-    def __expand_contractions(text: str, contraction_map: dict):
-        """
-        Expands the contractions in the text
-        """
-
+    def __expand_word_contractions(text: str, contraction_map: dict) -> str:
         contraction_regex_string = "({})".format('|'.join(contraction_map.keys()))
         contraction_regex_compiled = re.compile(pattern=contraction_regex_string, flags=re.IGNORECASE | re.DOTALL)
 
-        def expand_corpus(contraction):
+        def expand_corpus(contraction: re) -> str:
             contraction_match = contraction.group(0).lower()
             expanded_contraction = contraction_map.get(contraction_match)
             return expanded_contraction
@@ -162,32 +162,13 @@ class Normalizer:
         return expanded_corpus
 
     @staticmethod
-    def __clean_left_surrounding_text(word: str):
+    def __clean_left_surrounding_text(word: str) -> str:
         for match in re.finditer(pattern="\w+", string=word):
             first_letter = match.span()[0]
             return word[first_letter:]
 
     @staticmethod
-    def __set_punctuation_emphasis(word: str, emphasis_level: int, special_character_regex: re,
-                                   word_punctuation_regex: re, punctuation_regex: re):
-        if word_punctuation_regex.fullmatch(string=word):
-            after_word_divider = None
-            for match in punctuation_regex.finditer(string=word):
-                after_word_divider = match.span()[0]
-            word_part = word[:after_word_divider]
-            punctuation_part = word[after_word_divider:]
-            return word if len(punctuation_part) >= emphasis_level else word_part
-
-        # for words that have punctuations not included in the emphasis list
-        modified_sc_regex_compiled = re.compile(special_character_regex
-                                                .replace("-", "")
-                                                .replace("'", "")
-                                                .replace(".", ""))
-        for match in modified_sc_regex_compiled.finditer(string=word):
-            return word[:match.span()[0]]
-
-    @staticmethod
-    def __correct_word(word: str):
+    def __correct_word(word: str) -> str:
         """
         Corrects the word by removing irregular repeated letters, then suggests possible words intended to be used
         using the PyEnchant library. You can check it at http://pythonhosted.org/pyenchant/api/enchant.html
@@ -198,7 +179,7 @@ class Normalizer:
         repeat_regex_string = r'(\w*)(\w)\2(\w*)'
         repeat_regex_compiled = re.compile(pattern=repeat_regex_string)
 
-        def __check_word(old_word: str):
+        def __check_word(old_word: str) -> str:
             if wordnet.synsets(old_word):
                 return old_word
             else:
@@ -216,9 +197,130 @@ class Normalizer:
             final_correct_word = word_suggestions[0] if word_suggestions else initial_correct_word
             return final_correct_word
 
+    @property
+    def original_text(self):
+        return self._text
+
+    @original_text.setter
+    def original_text(self, value):
+        self._text = value
+
+    @property
+    def settings(self):
+        return self._settings
+
+    @settings.setter
+    def settings(self, value):
+        self._settings = value
+
+    @property
+    def normalized_text(self):
+        return self._normalized
+
+    @property
+    def raw_text(self):
+        return self._raw
+
+    @property
+    def extracted_tokens(self):
+        return self._tokens
+
     def __str__(self):
         return "[Normalized Text]: " + str(self._normalized) + "\n[Raw Text]: " + str(self._raw)\
                + "\n[Tokens]: " + str(self._tokens)
+
+    class Settings:
+        def __init__(self):
+            self._request_tokens = False
+            self._preserve_lettercase = False
+            self._minimum_word_length = 1
+
+            self._expand_word_contraction = False
+            self._contraction_map = TextNormalizer.DEFAULT_CONTRACTION_MAP
+            self._preserve_stopword = False
+
+            self._enable_pos_tag_filter = True
+            self._pos_tag_map = TextNormalizer.DEFAULT_POS_TAG_MAP
+            self._correct_spelling = False
+            self._preserve_wordform = False
+
+            self._preserve_special_character = False
+            self._preserve_punctuation_emphasis = False,
+            self._punctuation_emphasis_list = TextNormalizer.DEFAULT_PUNCTUATION_EMPHASIS
+            self._punctuation_emphasis_level = 1
+
+        def set_independent_properties(
+                self, minimum_word_length: int, request_tokens: bool, preserve_lettercase: bool) -> type(None):
+
+            self._request_tokens = request_tokens
+            self._preserve_lettercase = preserve_lettercase
+            self._minimum_word_length = minimum_word_length
+
+        def set_word_contraction_properties(
+                self, expand_contraction: bool = True, preserve_stopword: bool = True,
+                contraction_map: dict = None) -> type(None):
+
+            self._preserve_stopword = preserve_stopword
+            if preserve_stopword:
+                self._expand_word_contraction = expand_contraction
+                if contraction_map:
+                    self._contraction_map = contraction_map
+            else:
+                self._expand_word_contraction = False
+
+        def set_pos_tag_properties(
+                self, preserve_wordform: bool = False, correct_spelling: bool = False,
+                enable_pos_tag_filter: bool = True, pos_tag_map: dict = None) -> type(None):
+
+            self._enable_pos_tag_filter = enable_pos_tag_filter
+            if enable_pos_tag_filter:
+                self.set_special_character_properties(preserve_punctuation_emphasis=False)
+                self._preserve_wordform = preserve_wordform
+                self._correct_spelling = correct_spelling
+                if pos_tag_map:
+                    self._pos_tag_map = pos_tag_map
+            else:
+                self._preserve_wordform = False
+                self._correct_spelling = False
+
+        def set_special_character_properties(
+                self, preserve_special_character: bool = True, preserve_punctuation_emphasis: bool = True,
+                punctuation_emphasis_level: int = 1, punctuation_emphasis_list: str = None) -> type(None):
+
+            self._preserve_special_character = preserve_special_character
+            if preserve_punctuation_emphasis:
+                self.set_pos_tag_properties(enable_pos_tag_filter=False)
+                self._preserve_punctuation_emphasis = preserve_punctuation_emphasis
+                self._punctuation_emphasis_level = punctuation_emphasis_level
+                if punctuation_emphasis_list:
+                    self._punctuation_emphasis_list = punctuation_emphasis_list
+
+        def __str__(self):
+            all_properties = list(filter(lambda p: p.startswith("_") and not p.startswith("__"), dir(self)))
+
+            def __filter_property_type(type: type) -> dict:
+                return {property[1:].replace("_", " "): getattr(self, property) for property in all_properties
+                        if isinstance(getattr(self, property), type)}
+
+            toggled_properties = __filter_property_type(bool)
+            maps_properties = __filter_property_type(str)
+            maps_properties.update(__filter_property_type(dict))
+
+            return "Enabled Properties: " + str(maps_properties)
+
+    DEFAULT_PUNCTUATION_EMPHASIS = "?!"
+
+    PUNCTUATION_REGEX_STRING = "[{}]".format('|'.join(re.escape(DEFAULT_PUNCTUATION_EMPHASIS)))
+
+    WORD_PUNCTUATION_REGEX_STRING = "\w+" + PUNCTUATION_REGEX_STRING + "+"
+
+    SPECIAL_CHARACTER_REGEX_STRING = "[{}]".format(re.escape(string.punctuation))
+
+    SPECIAL_CHARACTER_REGEX = re.compile(pattern=SPECIAL_CHARACTER_REGEX_STRING)
+
+    PUNCTUATION_REGEX = re.compile(pattern=PUNCTUATION_REGEX_STRING + "+")
+
+    WORD_PUNCTUATION_REGEX = re.compile(pattern=WORD_PUNCTUATION_REGEX_STRING)
 
     NEGATIVE_STOPWORDS = ['no', 'not', 'ain', 'aren', 'couldn', 'didn', 'doesn', 'hadn', 'hasn', 'haven', 'isn',
                           'mightn', 'mustn', 'needn', 'shan', 'shouldn', 'wasn', 'wouldn']
@@ -354,12 +456,11 @@ class Normalizer:
     }
 
 
-
-
 class SentiText:
     """
     Identify sentiment-relevant string-level properties of input text.
     """
+
     def __init__(self, text):
         if not isinstance(text, str):
             text = str(text.encode('utf-8'))
@@ -428,23 +529,9 @@ class SentiText:
     PUNCTUATIONS = [".", "!", "?", ",", ";", ":", "-", "'", "\"", "!!", "!!!", "??", "???", "?!?", "!?!", "?!?!", "!?!?"]
 
 
-print(Normalizer( """
-The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
-It is the fifth installment in The Elder Scrolls series, following The Elder Scrolls IV: Oblivion.
-Skyrim's main story revolves around the player character and their effort to defeat Alduin the World-Eater, a dragon who is prophesied to destroy the world.
-The game is set two hundred years after the events of Oblivion and takes place in the fictional province of Skyrim.
-The player completes quests and develops the character by improving skills.
-Skyrim continues the open world tradition of its predecessors by allowing the player to travel anywhere in the game world at any time, and to ignore or postpone the main storyline indefinitely.
-The player may freely roam over the land of Skyrim, which is an open world environment consisting of wilderness expanses, dungeons, cities, towns, fortresses and villages.
-Players may navigate the game world more quickly by riding horses, or by utilizing a fast-travel system which allows them to warp to previously, and players have the option to develop their character.
-At the beginning of the game, players create their character by selecting one of several races, including humans, orcs, elves and anthropomorphic cat or lizard-like creatures, and then customizing their character's appearance, discovered locations.
-Over the course of the game, players improve their character's skills, which are numerical representations of their ability in certain areas.
-There are eighteen skills divided evenly among the three schools of combat, magic, and stealth.
-Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's wilderness.
-Like other creatures, Dragons are generated randomly in the world and will engage in combat.
-""")
-      .normalize_text(preserve_lettercase=True))
+print(TextNormalizer.create_normalizer("Some string FADAD :)").normalize_text(
+    request_tokens=True, preserve_special_character=True, preserve_punctuation_emphasis=True,
+    punctuation_emphasis_list="?!", punctuation_emphasis_level=2, preserve_stopword=True,
+    minimum_word_length=2, enable_pos_tag_filter=True, preserve_lettercase=True, correct_spelling=True))
 
-# preserve_special_character=True, preserve_punctation_emphasis=True,
-#                       punctuation_emphasis_list="?!", punctuation_emphasis_level=2, preserve_stopword=True,
-#                       minimum_word_length=2, enable_pos_tag=False, preserve_lettercase=True
+print(TextNormalizer.Settings())
