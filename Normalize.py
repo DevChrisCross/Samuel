@@ -20,40 +20,28 @@ class TextNormalizer:
     def create_normalizer(cls, text: str) -> "TextNormalizer":
         return cls(text, TextNormalizer.Settings())
 
-    # TODO transfer all parameters to a Normalizer.Setting object
-    # TODO an initializer to accept text and settings
-    def normalize_text(self, request_tokens: bool =False, expand_word_contraction: bool =False, contraction_map: dict =None,
-                       enable_pos_tag_filter: bool =True, pos_tag_map: dict =None, correct_spelling: bool =False,
-                       preserve_special_character: bool =False, preserve_punctuation_emphasis: bool =False,
-                       punctuation_emphasis_list: str =None, punctuation_emphasis_level: int =1,
-                       preserve_lettercase: bool =False, preserve_wordform: bool =False, preserve_stopword: bool =False,
-                       minimum_word_length: int =1) -> "TextNormalizer":
+    def __call__(self, *args, **kwargs) -> "TextNormalizer":
         """
         Tokenizes sentences and words, then removes present stopwords and special characters, then performs
         lemmatization and further remove words which does not qualify in the part-of-speech tag map.
-
-        :param contraction_map: expands the contractions in the given text
-        :param correct_spelling: checks and corrects the words in the given text
-            Be warned that enabling the module will perform an aggressive approach and will greatly decrease performance
-        :return: dictionary of normalized and raw sentences and its tokens
         """
 
+        settings = self.settings
         clean_text = TextNormalizer.__remove_html_tags(self._text)
         raw_sentences = nltk.sent_tokenize(clean_text)
-        if expand_word_contraction:
-            contraction_map = contraction_map if contraction_map else TextNormalizer.DEFAULT_CONTRACTION_MAP
-            raw_sentences = [TextNormalizer.__expand_word_contractions(sentence, contraction_map)
+        if settings.expand_word_contraction:
+            raw_sentences = [TextNormalizer.__expand_word_contractions(sentence, settings.contraction_map)
                              for sentence in raw_sentences]
 
         stopwords_en = nltk.corpus.stopwords.words('english')
         stopwords_en.extend(["n't", "'s", "'d", "'t", "'ve", "'ll"])
 
         lemmatizer = WordNetLemmatizer()
-        tokenized_sentences = [sentence.split() if preserve_punctuation_emphasis or preserve_special_character
+        tokenized_sentences = [sentence.split()
+                               if settings.preserve_punctuation_emphasis or settings.preserve_special_character
                                else nltk.word_tokenize(sentence) for sentence in raw_sentences]
 
         pos_tagged_sentences = nltk.pos_tag_sents(tokenized_sentences, tagset="universal")
-        pos_tag_map = pos_tag_map if pos_tag_map else TextNormalizer.DEFAULT_POS_TAG_MAP
 
         def __is_special_character(word: str):
             return TextNormalizer.SPECIAL_CHARACTER_REGEX.sub(string=word, repl="") == ""
@@ -64,35 +52,37 @@ class TextNormalizer:
             for pos_tagged_word in sentence:
                 word = pos_tagged_word[0]
                 if __is_special_character(word):
-                    if not preserve_special_character:
+                    if not settings.preserve_special_character:
                         continue
                     new_word = word
                 else:
-                    if len(word) < minimum_word_length:
+                    if len(word) < settings.minimum_word_length:
                         continue
                     new_word = word = TextNormalizer.__clean_left_surrounding_text(word)
                     if word in stopwords_en:
-                        if not preserve_stopword:
+                        if not settings.preserve_stopword:
                             continue
                         new_word = word
                     else:
-                        if preserve_punctuation_emphasis:
-                            if punctuation_emphasis_list:
-                                TextNormalizer.__reconstruct_regex(punctuation_emphasis_list)
-                            filtered_word = TextNormalizer.__set_punctuation_emphasis(word, punctuation_emphasis_level)
+                        if settings.preserve_punctuation_emphasis:
+                            if settings.punctuation_emphasis_list:
+                                TextNormalizer.__reconstruct_regex(settings.punctuation_emphasis_list)
+                            filtered_word = TextNormalizer.__set_punctuation_emphasis(
+                                word, settings.punctuation_emphasis_level)
                             new_word = word = filtered_word if filtered_word else word
                         pos_tag = pos_tagged_word[1]
-                        if enable_pos_tag_filter:
-                            if pos_tag not in pos_tag_map:
+                        if settings.enable_pos_tag_filter:
+                            if pos_tag not in settings.pos_tag_map:
                                 continue
-                            wordnet_tag = pos_tag_map[pos_tag]
-                            new_word = word if preserve_wordform else lemmatizer.lemmatize(word, wordnet_tag)
-                            new_word = TextNormalizer.__correct_word(new_word) if correct_spelling else new_word
-                    new_word = new_word if preserve_lettercase else new_word.lower()
+                            wordnet_tag = settings.pos_tag_map[pos_tag]
+                            new_word = word if settings.preserve_wordform else lemmatizer.lemmatize(word, wordnet_tag)
+                            new_word = (TextNormalizer.__correct_word(new_word) if settings.correct_spelling
+                                        else new_word)
+                    new_word = new_word if settings.preserve_lettercase else new_word.lower()
                 new_sentence.append(new_word)
             normalized_sentences.append(new_sentence)
 
-        if request_tokens:
+        if settings.request_tokens:
             tokens = list()
             for sentence in normalized_sentences:
                 for word in sentence:
@@ -226,8 +216,9 @@ class TextNormalizer:
         return self._tokens
 
     def __str__(self):
-        return "[Normalized Text]: " + str(self._normalized) + "\n[Raw Text]: " + str(self._raw)\
-               + "\n[Tokens]: " + str(self._tokens)
+        return ("[Normalized Text]: " + str(self._normalized)
+                + "\n[Raw Text]: " + str(self._raw)
+                + "\n[Tokens]: " + str(self._tokens))
 
     class Settings:
         def __init__(self):
@@ -250,7 +241,8 @@ class TextNormalizer:
             self._punctuation_emphasis_level = 1
 
         def set_independent_properties(
-                self, minimum_word_length: int, request_tokens: bool, preserve_lettercase: bool) -> type(None):
+                self, minimum_word_length: int, request_tokens: bool = False,
+                preserve_lettercase: bool = False) -> type(None):
 
             self._request_tokens = request_tokens
             self._preserve_lettercase = preserve_lettercase
@@ -295,6 +287,62 @@ class TextNormalizer:
                 if punctuation_emphasis_list:
                     self._punctuation_emphasis_list = punctuation_emphasis_list
 
+        @property
+        def request_tokens(self):
+            return self._request_tokens
+
+        @property
+        def preserve_lettercase(self):
+            return self._preserve_lettercase
+
+        @property
+        def minimum_word_length(self):
+            return self._minimum_word_length
+
+        @property
+        def expand_word_contraction(self):
+            return self._expand_word_contraction
+
+        @property
+        def contraction_map(self):
+            return self._contraction_map
+
+        @property
+        def preserve_stopword(self):
+            return self._preserve_stopword
+
+        @property
+        def enable_pos_tag_filter(self):
+            return self._enable_pos_tag_filter
+
+        @property
+        def pos_tag_map(self):
+            return self._pos_tag_map
+
+        @property
+        def correct_spelling(self):
+            return self._correct_spelling
+
+        @property
+        def preserve_wordform(self):
+            return self._preserve_wordform
+
+        @property
+        def preserve_special_character(self):
+            return self._preserve_special_character
+
+        @property
+        def preserve_punctuation_emphasis(self):
+            return self._preserve_punctuation_emphasis
+
+        @property
+        def punctuation_emphasis_list(self):
+            return self._punctuation_emphasis_list
+
+        @property
+        def punctuation_emphasis_level(self):
+            return self._punctuation_emphasis_level
+
         def __str__(self):
             all_properties = list(filter(lambda p: p.startswith("_") and not p.startswith("__"), dir(self)))
 
@@ -302,11 +350,23 @@ class TextNormalizer:
                 return {property[1:].replace("_", " "): getattr(self, property) for property in all_properties
                         if isinstance(getattr(self, property), type)}
 
+            numeric_properties = {key: value for key, value in __filter_property_type(int).items()
+                                  if not isinstance(value, bool)}
             toggled_properties = __filter_property_type(bool)
+            enabled_properties = dict()
+            disabled_properties = dict()
+            for key, value in toggled_properties.items():
+                if value:
+                    enabled_properties.update({key: value})
+                else:
+                    disabled_properties.update({key: value})
             maps_properties = __filter_property_type(str)
             maps_properties.update(__filter_property_type(dict))
 
-            return "Enabled Properties: " + str(maps_properties)
+            return ("Numeric Properties: " + str(numeric_properties)
+                    + "\nEnabled Properties: " + str(enabled_properties)
+                    + "\nDisabled Properties: " + str(disabled_properties)
+                    + "\nProperty Maps: " + str(maps_properties))
 
     DEFAULT_PUNCTUATION_EMPHASIS = "?!"
 
@@ -529,9 +589,11 @@ class SentiText:
     PUNCTUATIONS = [".", "!", "?", ",", ";", ":", "-", "'", "\"", "!!", "!!!", "??", "???", "?!?", "!?!", "?!?!", "!?!?"]
 
 
-print(TextNormalizer.create_normalizer("Some string FADAD :)").normalize_text(
-    request_tokens=True, preserve_special_character=True, preserve_punctuation_emphasis=True,
-    punctuation_emphasis_list="?!", punctuation_emphasis_level=2, preserve_stopword=True,
-    minimum_word_length=2, enable_pos_tag_filter=True, preserve_lettercase=True, correct_spelling=True))
+# print(TextNormalizer.create_normalizer("Some string FADAD :)").normalize_text(
+#     request_tokens=True, preserve_special_character=True, preserve_punctuation_emphasis=True,
+#     punctuation_emphasis_list="?!", punctuation_emphasis_level=2, preserve_stopword=True,
+#     minimum_word_length=2, enable_pos_tag_filter=True, preserve_lettercase=True, correct_spelling=True))
 
+textNormalizer = TextNormalizer("famous text goes here", TextNormalizer.Settings())
+print(textNormalizer())
 print(TextNormalizer.Settings())
