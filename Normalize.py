@@ -216,9 +216,12 @@ class TextNormalizer:
         return self._tokens
 
     def __str__(self):
-        return ("[Normalized Text]: " + str(self._normalized)
-                + "\n[Raw Text]: " + str(self._raw)
-                + "\n[Tokens]: " + str(self._tokens))
+        return ("\n" + "-"*200
+                + "\nNormalized Text: " + str(self._normalized)
+                + "\nRaw Text: " + str(self._raw)
+                + "\nTokens: " + str(self._tokens)
+                + "\n" + ":"*200 + "\n[Settings]\n" + str(self.settings)
+                + "\n" + "-"*200 + "\n")
 
     class Settings:
         def __init__(self):
@@ -242,15 +245,16 @@ class TextNormalizer:
 
         def set_independent_properties(
                 self, minimum_word_length: int, request_tokens: bool = False,
-                preserve_lettercase: bool = False) -> type(None):
+                preserve_lettercase: bool = False) -> "TextNormalizer.Settings":
 
             self._request_tokens = request_tokens
             self._preserve_lettercase = preserve_lettercase
             self._minimum_word_length = minimum_word_length
+            return self
 
         def set_word_contraction_properties(
                 self, expand_contraction: bool = True, preserve_stopword: bool = True,
-                contraction_map: dict = None) -> type(None):
+                contraction_map: dict = None) -> "TextNormalizer.Settings":
 
             self._preserve_stopword = preserve_stopword
             if preserve_stopword:
@@ -259,10 +263,11 @@ class TextNormalizer:
                     self._contraction_map = contraction_map
             else:
                 self._expand_word_contraction = False
+            return self
 
         def set_pos_tag_properties(
                 self, preserve_wordform: bool = False, correct_spelling: bool = False,
-                enable_pos_tag_filter: bool = True, pos_tag_map: dict = None) -> type(None):
+                enable_pos_tag_filter: bool = True, pos_tag_map: dict = None) -> "TextNormalizer.Settings":
 
             self._enable_pos_tag_filter = enable_pos_tag_filter
             if enable_pos_tag_filter:
@@ -274,10 +279,11 @@ class TextNormalizer:
             else:
                 self._preserve_wordform = False
                 self._correct_spelling = False
+            return self
 
         def set_special_character_properties(
                 self, preserve_special_character: bool = True, preserve_punctuation_emphasis: bool = True,
-                punctuation_emphasis_level: int = 1, punctuation_emphasis_list: str = None) -> type(None):
+                punctuation_emphasis_level: int = 1, punctuation_emphasis_list: str = None) -> "TextNormalizer.Settings":
 
             self._preserve_special_character = preserve_special_character
             if preserve_punctuation_emphasis:
@@ -286,6 +292,7 @@ class TextNormalizer:
                 self._punctuation_emphasis_level = punctuation_emphasis_level
                 if punctuation_emphasis_list:
                     self._punctuation_emphasis_list = punctuation_emphasis_list
+            return self
 
         @property
         def request_tokens(self):
@@ -588,12 +595,16 @@ class SentiText:
 
     PUNCTUATIONS = [".", "!", "?", ",", ";", ":", "-", "'", "\"", "!!", "!!!", "??", "???", "?!?", "!?!", "?!?!", "!?!?"]
 
-
+# deprecated version
 # print(TextNormalizer.create_normalizer("Some string FADAD :)").normalize_text(
 #     request_tokens=True, preserve_special_character=True, preserve_punctuation_emphasis=True,
 #     punctuation_emphasis_list="?!", punctuation_emphasis_level=2, preserve_stopword=True,
 #     minimum_word_length=2, enable_pos_tag_filter=True, preserve_lettercase=True, correct_spelling=True))
 
-textNormalizer = TextNormalizer("famous text goes here", TextNormalizer.Settings())
+
+settings = (TextNormalizer.Settings()
+            .set_independent_properties(minimum_word_length=2, request_tokens=True, preserve_lettercase=True)
+            .set_special_character_properties(punctuation_emphasis_level=4)
+            .set_word_contraction_properties())
+textNormalizer = TextNormalizer("I hope this group of film-makers never re-unites. ever again. IT SUCKS >:(", settings)
 print(textNormalizer())
-print(TextNormalizer.Settings())
