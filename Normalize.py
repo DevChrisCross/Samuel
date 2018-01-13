@@ -93,6 +93,17 @@ class TextNormalizer:
         self._raw = raw_sentences
         return self
 
+    def append(self, text: str) -> "TextNormalizer":
+        tn = TextNormalizer(text, self._settings)
+        normalized = tn()
+        self._text = " ".join([self._text, normalized.original_text])
+        self._raw.extend(normalized.raw_text)
+        self._normalized.extend(normalized.normalized_text)
+        if self._tokens:
+            self._tokens.extend(normalized.extracted_tokens)
+        return self
+
+
     @classmethod
     def __reconstruct_regex(cls, emphasis_list: str) -> type(None):
         cls.PUNCTUATION_REGEX_STRING = "[{}]".format('|'.join(re.escape(emphasis_list)))
@@ -607,4 +618,4 @@ settings = (TextNormalizer.Settings()
             .set_special_character_properties(punctuation_emphasis_level=4)
             .set_word_contraction_properties())
 textNormalizer = TextNormalizer("I hope this group of film-makers never re-unites. ever again. IT SUCKS >:(", settings)
-print(textNormalizer())
+print(textNormalizer().append("Here you go! :)"))
