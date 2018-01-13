@@ -6,6 +6,7 @@ import nltk
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 from itertools import product
+from typing import Dict, Type
 
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
@@ -15,10 +16,6 @@ class TextNormalizer:
         self._text = text
         self._normalized = self._tokens = self._raw = None
         self._settings = settings
-
-    @classmethod
-    def create_normalizer(cls, text: str) -> "TextNormalizer":
-        return cls(text, TextNormalizer.Settings())
 
     def __call__(self, *args, **kwargs) -> "TextNormalizer":
         """
@@ -93,6 +90,14 @@ class TextNormalizer:
         self._raw = raw_sentences
         return self
 
+    def __str__(self):
+        return ("\n" + "-"*200
+                + "\nNormalized Text: " + str(self._normalized)
+                + "\nRaw Text: " + str(self._raw)
+                + "\nTokens: " + str(self._tokens)
+                + "\n" + ":"*200 + "\n[Settings]\n" + str(self.settings)
+                + "\n" + "-"*200 + "\n")
+
     def append(self, text: str) -> "TextNormalizer":
         tn = TextNormalizer(text, self._settings)
         normalized = tn()
@@ -103,6 +108,9 @@ class TextNormalizer:
             self._tokens.extend(normalized.extracted_tokens)
         return self
 
+    @classmethod
+    def create_normalizer(cls, text: str) -> "TextNormalizer":
+        return cls(text, TextNormalizer.Settings())
 
     @classmethod
     def __reconstruct_regex(cls, emphasis_list: str) -> type(None):
@@ -150,7 +158,7 @@ class TextNormalizer:
         return text
 
     @staticmethod
-    def __expand_word_contractions(text: str, contraction_map: dict) -> str:
+    def __expand_word_contractions(text: str, contraction_map: Dict[str, str]) -> str:
         contraction_regex_string = "({})".format('|'.join(contraction_map.keys()))
         contraction_regex_compiled = re.compile(pattern=contraction_regex_string, flags=re.IGNORECASE | re.DOTALL)
 
@@ -202,17 +210,9 @@ class TextNormalizer:
     def original_text(self):
         return self._text
 
-    @original_text.setter
-    def original_text(self, value):
-        self._text = value
-
     @property
     def settings(self):
         return self._settings
-
-    @settings.setter
-    def settings(self, value):
-        self._settings = value
 
     @property
     def normalized_text(self):
@@ -226,13 +226,13 @@ class TextNormalizer:
     def extracted_tokens(self):
         return self._tokens
 
-    def __str__(self):
-        return ("\n" + "-"*200
-                + "\nNormalized Text: " + str(self._normalized)
-                + "\nRaw Text: " + str(self._raw)
-                + "\nTokens: " + str(self._tokens)
-                + "\n" + ":"*200 + "\n[Settings]\n" + str(self.settings)
-                + "\n" + "-"*200 + "\n")
+    @original_text.setter
+    def original_text(self, value: str):
+        self._text = value
+
+    @settings.setter
+    def settings(self, value: "TextNormalizer.Settings"):
+        self._settings = value
 
     class Settings:
         def __init__(self):
@@ -254,6 +254,31 @@ class TextNormalizer:
             self._punctuation_emphasis_list = TextNormalizer.DEFAULT_PUNCTUATION_EMPHASIS
             self._punctuation_emphasis_level = 1
 
+        def __str__(self):
+            all_properties = list(filter(lambda p: p.startswith("_") and not p.startswith("__"), dir(self)))
+
+            def __filter_property_type(type: Type) -> dict:
+                return {property[1:].replace("_", " "): getattr(self, property) for property in all_properties
+                        if isinstance(getattr(self, property), type)}
+
+            numeric_properties = {key: value for key, value in __filter_property_type(int).items()
+                                  if not isinstance(value, bool)}
+            toggled_properties = __filter_property_type(bool)
+            enabled_properties = dict()
+            disabled_properties = dict()
+            for key, value in toggled_properties.items():
+                if value:
+                    enabled_properties.update({key: value})
+                else:
+                    disabled_properties.update({key: value})
+            maps_properties = __filter_property_type(str)
+            maps_properties.update(__filter_property_type(dict))
+
+            return ("Numeric Properties: " + str(numeric_properties)
+                    + "\nEnabled Properties: " + str(enabled_properties)
+                    + "\nDisabled Properties: " + str(disabled_properties)
+                    + "\nProperty Maps: " + str(maps_properties))
+
         def set_independent_properties(
                 self, minimum_word_length: int, request_tokens: bool = False,
                 preserve_lettercase: bool = False) -> "TextNormalizer.Settings":
@@ -265,7 +290,7 @@ class TextNormalizer:
 
         def set_word_contraction_properties(
                 self, expand_contraction: bool = True, preserve_stopword: bool = True,
-                contraction_map: dict = None) -> "TextNormalizer.Settings":
+                contraction_map: Dict[str, str] = None) -> "TextNormalizer.Settings":
 
             self._preserve_stopword = preserve_stopword
             if preserve_stopword:
@@ -278,7 +303,7 @@ class TextNormalizer:
 
         def set_pos_tag_properties(
                 self, preserve_wordform: bool = False, correct_spelling: bool = False,
-                enable_pos_tag_filter: bool = True, pos_tag_map: dict = None) -> "TextNormalizer.Settings":
+                enable_pos_tag_filter: bool = True, pos_tag_map: Dict[str, str] = None) -> "TextNormalizer.Settings":
 
             self._enable_pos_tag_filter = enable_pos_tag_filter
             if enable_pos_tag_filter:
@@ -360,31 +385,6 @@ class TextNormalizer:
         @property
         def punctuation_emphasis_level(self):
             return self._punctuation_emphasis_level
-
-        def __str__(self):
-            all_properties = list(filter(lambda p: p.startswith("_") and not p.startswith("__"), dir(self)))
-
-            def __filter_property_type(type: type) -> dict:
-                return {property[1:].replace("_", " "): getattr(self, property) for property in all_properties
-                        if isinstance(getattr(self, property), type)}
-
-            numeric_properties = {key: value for key, value in __filter_property_type(int).items()
-                                  if not isinstance(value, bool)}
-            toggled_properties = __filter_property_type(bool)
-            enabled_properties = dict()
-            disabled_properties = dict()
-            for key, value in toggled_properties.items():
-                if value:
-                    enabled_properties.update({key: value})
-                else:
-                    disabled_properties.update({key: value})
-            maps_properties = __filter_property_type(str)
-            maps_properties.update(__filter_property_type(dict))
-
-            return ("Numeric Properties: " + str(numeric_properties)
-                    + "\nEnabled Properties: " + str(enabled_properties)
-                    + "\nDisabled Properties: " + str(disabled_properties)
-                    + "\nProperty Maps: " + str(maps_properties))
 
     DEFAULT_PUNCTUATION_EMPHASIS = "?!"
 
