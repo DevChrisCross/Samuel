@@ -7,6 +7,7 @@ import warnings
 from typing import Callable, Tuple, Optional, Type, Dict, Union, Set, List, overload
 from enum import Enum
 from Normalize import TextNormalizer
+from textwrap import wrap, fill, indent
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
@@ -69,7 +70,11 @@ class Summarizer:
         return self
 
     def __str__(self):
-        return ""
+        return ("\n" + "-"*200
+                + "\nNormalized Text:\n" + indent("\n".join([str(array) for array in self._normalized_text]),"\t")
+                + "\n\nSummary:\n" + indent(fill(str(self._summary_text), width=150), "\t")
+                + "\n" + ":"*200 + "\n[Settings]\n" + str(self._settings)
+                + "\n" + "-"*200 + "\n")
 
     def __lexrank(self):
         """
@@ -404,6 +409,17 @@ class Summarizer:
                     return
                 self._reranking_mode = reranking_mode
                 self._ranking_map[reranking_mode.name]["setter"]()
+
+        def __str__(self):
+            return ("Rank Mode: " + self._ranking_mode.name
+                    + "\nParameters: "
+                    + str([str(key) + " => " + str(value)
+                           for key, value in self.parameters_of(self._ranking_mode).items()])
+                    + "\nRerank Mode: " + (self._reranking_mode.name if self._reranking_mode else "None")
+                    + "\nParameters: "
+                    + str([str(key) + " => " + str(value)
+                           for key, value in self.parameters_of(self._reranking_mode).items()]
+                          if self._reranking_mode else None))
 
         def set_divrank_parameters(self, lambda_value: float = 0.9, alpha_value: float = 0.25, beta_value: float = None,
                                    cos_threshold: float = 0.1) -> type(None):

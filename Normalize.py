@@ -7,6 +7,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 from itertools import product
 from typing import Dict, Type
+from textwrap import indent
 
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
@@ -92,10 +93,10 @@ class TextNormalizer:
 
     def __str__(self):
         return ("\n" + "-"*200
-                + "\nNormalized Text: " + str(self._normalized)
-                + "\nRaw Text: " + str(self._raw)
-                + "\nTokens: " + str(self._tokens)
-                + "\n" + ":"*200 + "\n[Settings]\n" + str(self.settings)
+                + "\nNormalized Text:\n" + indent("\n".join([str(array) for array in self._normalized]), "\t")
+                + "\n\nRaw Text:\n" + indent("\n".join(self._raw), "\t")
+                + "\n\nTokens: " + str(self._tokens)
+                + "\n" + ":"*200 + "\n[Settings]\n" + str(self._settings)
                 + "\n" + "-"*200 + "\n")
 
     def append(self, text: str) -> "TextNormalizer":
