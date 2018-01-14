@@ -1,8 +1,8 @@
 from googletrans import Translator
 
 translator = Translator(service_urls=[
-      'translate.google.com',
-    ])
+    'translate.google.com',
+])
 
 
 def translate(corpus):
@@ -23,7 +23,3 @@ def translate(corpus):
 #                  u"Kailangan mo lang matututong maghintay"
 #
 # print(translate(hugot))
-
-
-def TransLator():
-    print('asd')

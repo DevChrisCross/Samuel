@@ -1,8 +1,8 @@
-from Normalize import normalize_text
-from Translator import translate
-from Summarizer import summarizer
-from TopicModelling import topic_modelling
-from UnsupervisedExtractor import unsupervised_extractor
+from TextNormalizer import normalize_text
+from TextTranslator import translate
+from TextSummarizer import summarizer
+from TextTopicModeller import topic_modelling
+from TextSentimentClassifier import unsupervised_extractor
 from warnings import filterwarnings
 from pprint import pprint
 

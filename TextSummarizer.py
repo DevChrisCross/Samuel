@@ -6,26 +6,26 @@ from pprint import pprint
 import warnings
 from typing import Callable, Tuple, Optional, Type, Dict, Union, Set, List, overload
 from enum import Enum
-from Normalize import TextNormalizer
+from TextNormalizer import TextNormalizer
 from textwrap import wrap, fill, indent
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
-
-class Summarizer:
+# TODO put additional properties
+class TextSummarizer:
     Word = str
     WordCountRow = Dict[Word, int]
     WordVector = Dict[int, WordCountRow]
     WordDictionary = Set[Word]
     NormalizedSentence = List[Word]
 
-    def __init__(self, normalized_text: "TextNormalizer", settings: "Summarizer.Settings" = None):
+    def __init__(self, normalized_text: "TextNormalizer", settings: "TextSummarizer.Settings" = None):
         self._text = normalized_text.original_text
         self._raw_text = normalized_text.raw_text
         self._normalized_text = normalized_text.normalized_text
 
-        self._word_vector, self._word_dictionary = Summarizer.__build_term_frequency(self._normalized_text)
-        self._idf = Summarizer.__build_inverse_document_frequency(self._word_vector, self._word_dictionary)
-        self._cosine_matrix = Summarizer.__build_cosine_matrix(self._word_vector, self._idf)
+        self._word_vector, self._word_dictionary = TextSummarizer.__build_term_frequency(self._normalized_text)
+        self._idf = TextSummarizer.__build_inverse_document_frequency(self._word_vector, self._word_dictionary)
+        self._cosine_matrix = TextSummarizer.__build_cosine_matrix(self._word_vector, self._idf)
 
         self._summary_text = None
         self._summary_scores = [{
@@ -33,9 +33,9 @@ class Summarizer:
             "raw_text": self._raw_text[i],
             "norm_text": self._normalized_text[i]
         } for i in range(len(self._raw_text))]
-        self._settings = settings if settings else Summarizer.Settings()
+        self._settings = settings if settings else TextSummarizer.Settings()
 
-    def __call__(self, summary_length: int, sort_by_score: bool = False, *args, **kwargs) -> "Summarizer":
+    def __call__(self, summary_length: int, sort_by_score: bool = False, *args, **kwargs) -> "TextSummarizer":
         """
         Summarizes a document using the specified ranking algorithm set by the user.
 
@@ -108,7 +108,7 @@ class Summarizer:
                 new_state[i] = (damping_factor / __length) + ((1 - damping_factor) * summation_j)
             return new_state
 
-        lexrank_scores = Summarizer.__power_method(initial_state, generate_lexrank, settings.threshold)
+        lexrank_scores = TextSummarizer.__power_method(initial_state, generate_lexrank, settings.threshold)
         for i in range(num_of_sentences):
             self._summary_scores[i][settings.ranking_mode["name"]] = float("{0:.3f}".format(lexrank_scores[i]))
 
@@ -163,7 +163,7 @@ class Summarizer:
                 new_state[i] = ((1 - lambda_value) * prior_distribution) + (lambda_value * summation_j)
             return new_state
 
-        divrank_scores = Summarizer.__power_method(initial_state, generate_divrank, settings.threshold)
+        divrank_scores = TextSummarizer.__power_method(initial_state, generate_divrank, settings.threshold)
         for i in range(num_of_sentences):
             self._summary_scores[i][settings.ranking_mode["name"]] = float("{0:.3f}".format(divrank_scores[i]))
 
@@ -244,7 +244,7 @@ class Summarizer:
 
         def reconstruct_cosine_matrix():
             sentences.extend(TextNormalizer.create_normalizer(params["query"])().normalized_text)
-            tf = Summarizer.__build_term_frequency(sentences)
+            tf = TextSummarizer.__build_term_frequency(sentences)
             idf = self.__build_inverse_document_frequency(tf[0], tf[1])
             return self.__build_cosine_matrix(tf[0], idf)
 
@@ -518,7 +518,7 @@ Like other creatures, Dragons are generated randomly in the world and will engag
 """
 
 tn = TextNormalizer(document2)
-summarizer = Summarizer(tn())
+summarizer = TextSummarizer(tn())
 print(summarizer(summary_length=5))
 # pprint(Summarizer(tn()).summarizer(summary_length=5, rank_mode="D", rerank=True, query="game engine").summary_text)
 # pprint(summarizer(document1, summary_length=3, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))

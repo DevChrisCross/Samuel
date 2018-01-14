@@ -1,7 +1,8 @@
 import math
 import nltk.data
-from Normalize import SentiText
+from TextNormalizer import SentiText
 
+# TODO pending refactoring
 ##Constants##
 # (empirically derived mean sentiment intensity rating increase for booster words)
 B_INCR = 0.293

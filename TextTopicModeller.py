@@ -6,7 +6,7 @@ import json
 import gensim
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
-
+# TODO for refactoring, make a consistent environment
 def topic_modelling(normalized_text, visualize=False):
     bi_gram = gensim.models.Phrases(normalized_text)
     normalized_text = [bi_gram[line] for line in normalized_text]
