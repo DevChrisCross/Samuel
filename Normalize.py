@@ -12,10 +12,10 @@ warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
 class TextNormalizer:
-    def __init__(self, text: str, settings: "TextNormalizer.Settings"):
+    def __init__(self, text: str, settings: "TextNormalizer.Settings" = None):
         self._text = text
         self._normalized = self._tokens = self._raw = None
-        self._settings = settings
+        self._settings = settings if settings else TextNormalizer.Settings()
 
     def __call__(self, *args, **kwargs) -> "TextNormalizer":
         """
@@ -107,10 +107,6 @@ class TextNormalizer:
         if self._tokens:
             self._tokens.extend(normalized.extracted_tokens)
         return self
-
-    @classmethod
-    def create_normalizer(cls, text: str) -> "TextNormalizer":
-        return cls(text, TextNormalizer.Settings())
 
     @classmethod
     def __reconstruct_regex(cls, emphasis_list: str) -> type(None):

@@ -4,7 +4,7 @@ import string
 import nltk
 from pprint import pprint
 import warnings
-from typing import Callable, Tuple, Optional, Type, Dict, Union, Set, List
+from typing import Callable, Tuple, Optional, Type, Dict, Union, Set, List, overload
 from enum import Enum
 from Normalize import TextNormalizer
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
@@ -17,7 +17,7 @@ class Summarizer:
     WordDictionary = Set[Word]
     NormalizedSentence = List[Word]
 
-    def __init__(self, normalized_text: "TextNormalizer", settings: "Summarizer.Settings"):
+    def __init__(self, normalized_text: "TextNormalizer", settings: "Summarizer.Settings" = None):
         self._text = normalized_text.original_text
         self._raw_text = normalized_text.raw_text
         self._normalized_text = normalized_text.normalized_text
@@ -32,8 +32,7 @@ class Summarizer:
             "raw_text": self._raw_text[i],
             "norm_text": self._normalized_text[i]
         } for i in range(len(self._raw_text))]
-
-        self._settings = settings
+        self._settings = settings if settings else Summarizer.Settings()
 
     def __call__(self, summary_length: int, sort_by_score: bool = False, *args, **kwargs) -> "Summarizer":
         """
@@ -50,7 +49,8 @@ class Summarizer:
             rank.LEXRANK.name: self.__lexrank,
             rank.GRASSHOPPER.name: self.__grasshopper,
         }
-        rank_function_map[settings.ranking_mode["name"]]()
+        scorebase = settings.ranking_mode["name"]
+        rank_function_map[scorebase]()
 
         rerank = settings.Rerank
         if settings.reranking_mode:
@@ -58,19 +58,18 @@ class Summarizer:
                 self.__maximal_marginal_relevance()
             if settings.reranking_mode["name"] == rerank.GRASSHOPPER.name:
                 self.__grasshopper()
+            scorebase = settings.reranking_mode["name"]
         self._summary_scores.sort(key=lambda sentence: sentence[scorebase], reverse=True)
 
         _summary = self._summary_scores[:summary_length]
-        scorebase = ((settings.reranking_mode["name"] if settings.reranking_mode else settings.ranking_mode["name"])
-                     if sort_by_score else "index")
+        scorebase = scorebase if sort_by_score else "index"
         _summary.sort(key=lambda sentence: sentence[scorebase], reverse=sort_by_score)
         summary_text = " ".join([sentence["raw_text"] for sentence in _summary])
         self._summary_text = summary_text
         return self
 
-    @classmethod
-    def create_summarizer(cls, normalized_text: "TextNormalizer") -> "Summarizer":
-        return cls(normalized_text, Summarizer.Settings())
+    def __str__(self):
+        return ""
 
     def __lexrank(self):
         """
@@ -502,7 +501,9 @@ Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's 
 Like other creatures, Dragons are generated randomly in the world and will engage in combat.
 """
 
-tn = TextNormalizer.create_normalizer(document2)
+tn = TextNormalizer(document2)
+summarizer = Summarizer(tn())
+print(summarizer(summary_length=5))
 # pprint(Summarizer(tn()).summarizer(summary_length=5, rank_mode="D", rerank=True, query="game engine").summary_text)
 # pprint(summarizer(document1, summary_length=3, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
 # pprint(extract_keyphrase(document2))
