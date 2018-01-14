@@ -4,13 +4,19 @@ import string
 import nltk
 from pprint import pprint
 import warnings
-from typing import Callable, Tuple, Optional, Type, Dict, Union
+from typing import Callable, Tuple, Optional, Type, Dict, Union, Set, List
 from enum import Enum
 from Normalize import TextNormalizer
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
 class Summarizer:
+    Word = str
+    WordCountRow = Dict[Word, int]
+    WordVector = Dict[int, WordCountRow]
+    WordDictionary = Set[Word]
+    NormalizedSentence = List[Word]
+
     def __init__(self, normalized_text: "TextNormalizer", settings: "Summarizer.Settings"):
         self._text = normalized_text.original_text
         self._raw_text = normalized_text.raw_text
@@ -100,7 +106,7 @@ class Summarizer:
 
         lexrank_scores = Summarizer.__power_method(initial_state, generate_lexrank, settings.threshold)
         for i in range(num_of_sentences):
-            self._summary_scores[i]["lexrank_score"] = float("{0:.3f}".format(lexrank_scores[i]))
+            self._summary_scores[i][settings.ranking_mode["name"]] = float("{0:.3f}".format(lexrank_scores[i]))
 
     def __divrank(self):
         """
@@ -272,10 +278,7 @@ class Summarizer:
         self._summary_scores = ranked_sentences
 
     @staticmethod
-    def __build_term_frequency(sentences, n_gram: int = 1) -> Tuple[dict, set]:
-        """
-        Feature extractor using the Bag-of-Words model
-        """
+    def __build_term_frequency(sentences: List[NormalizedSentence], n_gram: int = 1) -> Tuple[WordVector, WordDictionary]:
         # initialize word_dictionary set
         word_dictionary = set()
         for sentence in sentences:
@@ -300,11 +303,7 @@ class Summarizer:
         return word_vector, word_dictionary
 
     @staticmethod
-    def __build_inverse_document_frequency(tf, dictionary) -> dict:
-        """
-        Feature Extraction partially from the known TF-IDF modely
-        """
-
+    def __build_inverse_document_frequency(tf: WordVector, dictionary: WordDictionary) -> Dict[Word, float]:
         total_docs = len(tf)
         doc_frequency = {word: 0.0 for word in dictionary}
         for row in tf:
@@ -316,18 +315,9 @@ class Summarizer:
         return inv_frequency
 
     @staticmethod
-    def __build_cosine_matrix(tf, idf) -> list:
-        """
-        Constructs a idf modified cosine similarity matrix
-        """
-
-        num_of_sentences = len(tf)
+    def __build_cosine_matrix(tf: WordVector, idf: Dict[Word, float]) -> List[List[float]]:
 
         def idf_modified_cosine(x, y):
-            """
-            Computes idf modified cosine similarity value of two sentences
-            """
-
             numerator = 0
             summation_x = summation_y = 0
             dictionary = tf[x]
@@ -342,12 +332,13 @@ class Summarizer:
             idf_cosine = float("{0:.3f}".format(idf_cosine))
             return idf_cosine
 
+        num_of_sentences = len(tf)
         cosine_matrix = [[idf_modified_cosine(i, j) for j in range(num_of_sentences)] for i in range(num_of_sentences)]
         return cosine_matrix
 
     @staticmethod
     def __power_method(initial_state: np.ndarray, generate_state_function: Callable[[np.ndarray], np.ndarray],
-                       threshold: float) -> list:
+                       threshold: float) -> List[float]:
         """
         Computes for the stationary distribution of a given Markov chain or transition matrix
 
