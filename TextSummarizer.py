@@ -28,7 +28,7 @@ class TextSummarizer:
         self._cosine_matrix = TextSummarizer.__build_cosine_matrix(self._word_vector, self._idf)
 
         self._summary_text = None
-        self._summary_scores = [{
+        self._sentences_score = [{
             "index": i,
             "raw_text": self._raw_text[i],
             "norm_text": self._normalized_text[i]
@@ -60,9 +60,9 @@ class TextSummarizer:
             if settings.reranking_mode["name"] == rerank.GRASSHOPPER.name:
                 self.__grasshopper()
             scorebase = settings.reranking_mode["name"]
-        self._summary_scores.sort(key=lambda sentence: sentence[scorebase], reverse=True)
+        self._sentences_score.sort(key=lambda sentence: sentence[scorebase], reverse=True)
 
-        _summary = self._summary_scores[:summary_length]
+        _summary = self._sentences_score[:summary_length]
         scorebase = scorebase if sort_by_score else "index"
         _summary.sort(key=lambda sentence: sentence[scorebase], reverse=sort_by_score)
         summary_text = " ".join([sentence["raw_text"] for sentence in _summary])
@@ -92,7 +92,7 @@ class TextSummarizer:
 
         settings = self._settings
         params = settings.ranking_mode["constant_parameters"]
-        num_of_sentences = len(self._summary_scores)
+        num_of_sentences = len(self._sentences_score)
         cosine_matrix = self._cosine_matrix[:]
         initial_state = np.full(shape=num_of_sentences, fill_value=1 / num_of_sentences)
 
@@ -110,7 +110,7 @@ class TextSummarizer:
 
         lexrank_scores = TextSummarizer.__power_method(initial_state, generate_lexrank, settings.threshold)
         for i in range(num_of_sentences):
-            self._summary_scores[i][settings.ranking_mode["name"]] = float("{0:.3f}".format(lexrank_scores[i]))
+            self._sentences_score[i][settings.ranking_mode["name"]] = float("{0:.3f}".format(lexrank_scores[i]))
 
     def __divrank(self):
         """
@@ -128,7 +128,7 @@ class TextSummarizer:
 
         settings = self._settings
         params = settings.ranking_mode["constant_parameters"]
-        num_of_sentences = len(self._summary_scores)
+        num_of_sentences = len(self._sentences_score)
         cosine_matrix = self._cosine_matrix[:]
 
         cosine_matrix = [[(1 if cosine_matrix[i][j] > params["cos_threshold"] else 0) for j in range(num_of_sentences)]
@@ -165,7 +165,7 @@ class TextSummarizer:
 
         divrank_scores = TextSummarizer.__power_method(initial_state, generate_divrank, settings.threshold)
         for i in range(num_of_sentences):
-            self._summary_scores[i][settings.ranking_mode["name"]] = float("{0:.3f}".format(divrank_scores[i]))
+            self._sentences_score[i][settings.ranking_mode["name"]] = float("{0:.3f}".format(divrank_scores[i]))
 
     def __grasshopper(self):
         """
@@ -205,8 +205,8 @@ class TextSummarizer:
 
         settings = self._settings
         params = settings.parameters_of(settings.Rank.GRASSHOPPER)
-        num_of_sentences = len(self._summary_scores)
-        ranked_sentences = self._summary_scores
+        num_of_sentences = len(self._sentences_score)
+        ranked_sentences = self._sentences_score
 
         cosine_matrix = reconstruct_cosine_matrix()
         grasshopper_scores = list()
@@ -227,7 +227,7 @@ class TextSummarizer:
             distribution = stationary_distribution
 
         for i in range(num_of_sentences):
-            self._summary_scores[i][settings.Rank.GRASSHOPPER.name] = (
+            self._sentences_score[i][settings.Rank.GRASSHOPPER.name] = (
                 len(grasshopper_scores) - grasshopper_scores.index(i) if i in grasshopper_scores else -1)
 
     def __maximal_marginal_relevance(self):
@@ -266,7 +266,7 @@ class TextSummarizer:
         settings = self._settings
         params = settings.reranking_mode["constant_parameters"]
         sentences = self._normalized_text[:]
-        ranked_sentences = self._summary_scores[:]
+        ranked_sentences = self._sentences_score[:]
 
         cosine_matrix = reconstruct_cosine_matrix()
         mmr_name = self._settings.reranking_mode["name"]
@@ -279,7 +279,7 @@ class TextSummarizer:
             ranked_sentences.remove(sentence)
 
         normalize_mmr_scores()
-        self._summary_scores = ranked_sentences
+        self._sentences_score = ranked_sentences
 
     @staticmethod
     def __build_term_frequency(sentences: List[NormalizedSentence], n_gram: int = 1) -> Tuple[WordVector, WordDictionary]:
@@ -364,8 +364,36 @@ class TextSummarizer:
         return new_state.tolist()
 
     @property
+    def word_vector(self):
+        return self._word_vector
+
+    @property
+    def word_dictionary(self):
+        return self._word_dictionary
+
+    @property
+    def inverse_document_frequency(self):
+        return self._idf
+
+    @property
+    def cosine_similarity_matrix(self):
+        return self._cosine_matrix
+
+    @property
+    def sentences_score(self):
+        return self._sentences_score
+
+    @property
     def summary_text(self):
         return self._summary_text
+
+    @property
+    def settings(self):
+        return self._settings
+
+    @settings.setter
+    def settings(self, value: "TextSummarizer.Settings"):
+        self._settings = value
 
     class Settings:
         class Rank(Enum):
