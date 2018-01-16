@@ -243,7 +243,7 @@ class TextSummarizer:
         """
 
         def reconstruct_cosine_matrix():
-            sentences.extend(TextNormalizer.create_normalizer(params["query"])().normalized_text)
+            sentences.extend(TextNormalizer(params["query"])().normalized_text)
             tf = TextSummarizer.__build_term_frequency(sentences)
             idf = self.__build_inverse_document_frequency(tf[0], tf[1])
             return self.__build_cosine_matrix(tf[0], idf)
