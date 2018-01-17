@@ -16,6 +16,11 @@ def samuel_api():
     return jsonify(Samuel.api(request.get_json()))
 
 
+@app.route('/samuel_init', methods=['POST'])
+def data_entry():
+    return jsonify(Samuel.init())
+
+
 @app.route('/data_entry', methods=['POST'])
 def data_entry():
     return jsonify(request.get_json())

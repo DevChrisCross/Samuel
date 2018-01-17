@@ -1,20 +1,40 @@
-from TextNormalizer import normalize_text
-from TextTranslator import translate
-from TextSummarizer import summarizer
+from TextNormalizer import TextNormalizer
+from TextTranslator import translate, Language
+from TextSummarizer import TextSummarizer
 from TextTopicModeller import topic_modelling
 from TextSentimentClassifier import unsupervised_extractor
 from warnings import filterwarnings
+from enum import Enum
+from typing import Type
+
 from pprint import pprint
 
 filterwarnings(action='ignore')
 
+def init():
+    Rank = TextSummarizer.Settings.Rank
+    Rerank = TextSummarizer.Settings.Rerank
+
+    def parse_enum(enumeration: Type[Enum]):
+        return str({en.name: en.name for en in enumeration})
+
+    return{
+        'Rank': parse_enum(Rank),
+        'Rerank': parse_enum(Rerank),
+        'Language': parse_enum(Language)
+    }
+
 
 def api(data):
-    corpus = data['corpus']
-    corpus = translate(corpus)
-    normalized_corpus = normalize_text(corpus)
 
-    # pprint(data)
+    def check_param(default,param,value):
+        return default if param not in data else value
+
+    corpus = data['corpus']
+
+    translate_from = check_param(Language.TAGALOG,"translate_from",data['translate_from'])
+    translate_to = check_param(Language.ENGLISH, "translate_to", data['translate_to'])
+    corpus = translate(corpus, translate_from, translate_to)
 
     # For Unsupervised Extractor
     threshold_extractor = 0.1 if 'threshold_extractor' not in data else data['threshold_extractor']
@@ -34,13 +54,59 @@ def api(data):
     rerank = False if 'rerank' not in data else data['rerank']
     query = None if 'query' not in data else data['query']
     sort_score = False if 'sort_score' not in data else data['sort_score']
-    split_sent = False if 'split_sent' not in data else data['split_sent']
-    correct_sent = False if 'correct_sent' not in data else data['correct_sent']
-    tokenize_sent = True if 'tokenize_sent' not in data else data['tokenize_sent']
+    #split_sent = False if 'split_sent' not in data else data['split_sent']
+    #correct_sent = False if 'correct_sent' not in data else data['correct_sent']
+    #tokenize_sent = True if 'tokenize_sent' not in data else data['tokenize_sent']
 
     summarized_corpus = summarizer(corpus, summary_length, threshold_summarizer, rank, rerank, query, sort_score,
                                    split_sent,
                                    correct_sent, tokenize_sent)
+
+    # TEXT NORMALIZER
+    request_tokens = False
+    preserve_lettercase = False
+    minimum_word_length = 1
+
+    expand_word_contraction = False
+    contraction_map = TextNormalizer.DEFAULT_CONTRACTION_MAP
+    preserve_stopword = False
+
+    enable_pos_tag_filter = True
+    pos_tag_map = TextNormalizer.DEFAULT_POS_TAG_MAP
+    correct_spelling = False
+    preserve_wordform = False
+
+    preserve_special_character = False
+    preserve_punctuation_emphasis = False
+    punctuation_emphasis_list = TextNormalizer.DEFAULT_PUNCTUATION_EMPHASIS
+    punctuation_emphasis_level = 1
+
+    settings = (TextNormalizer.Settings()
+        .set_independent_properties(minimum_word_length, request_tokens, preserve_lettercase)
+        .set_word_contraction_properties(expand_word_contraction, preserve_stopword, contraction_map)
+        .set_special_character_properties(preserve_special_character, preserve_punctuation_emphasis,
+                                          punctuation_emphasis_level, punctuation_emphasis_list)
+        .set_pos_tag_properties(preserve_wordform, correct_spelling, enable_pos_tag_filter, pos_tag_map))
+    normalized_corpus = TextNormalizer(corpus, settings)
+
+    # TEXT SUMMARIZER
+    Rank = TextSummarizer.Settings.Rank
+    Rerank = TextSummarizer.Settings.Rerank
+
+    summary_length = data['summary_length']
+    sort_by_score = False if 'sort_score' not in data else data['sort_score']
+    threshold_summarizer = 0.001 if 'threshold_summarizer' not in data else data['threshold_summarizer']
+    rank = "D" if 'rank' not in data else data['rank']
+    rerank = False if 'rerank' not in data else data['rerank']
+    query = None if 'query' not in data else data['query']
+    RankType =
+    RerankType =
+    tsSettings = TextSummarizer.Settings(RankType, RerankType)
+
+
+    rank_map = {
+        Rank.DIVRANK.name: {}
+    }
 
     return {
         'summarized_text': summarized_corpus['text'],

@@ -1,12 +1,18 @@
 from googletrans import Translator
+from enum import Enum
 
 translator = Translator(service_urls=[
     'translate.google.com',
 ])
 
 
-def translate(corpus):
-    translated_corpus = translator.translate(corpus, 'en', 'tl')
+class Language(Enum):
+    TAGALOG = "tl"
+    ENGLISH = "en"
+
+
+def translate(corpus: str, translate_from: "Language" = Language.ENGLISH, translate_to: "Language" = Language.TAGALOG):
+    translated_corpus = translator.translate(corpus, translate_from, translate_to)
     return translated_corpus.text
 
 
