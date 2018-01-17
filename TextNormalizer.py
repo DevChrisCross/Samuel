@@ -125,9 +125,10 @@ class TextNormalizer:
             punctuation_part = word[after_word_divider:]
             return word if len(punctuation_part) >= emphasis_level else word_part
 
+        new_word = word
         for match in re.finditer(pattern="\w+", string=word):
-            word = word[:match.span()[1]]
-        return word
+            new_word = word[:match.span()[1]]
+        return new_word
 
     @staticmethod
     def __remove_html_tags(text: str) -> str:
