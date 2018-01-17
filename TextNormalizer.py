@@ -63,11 +63,10 @@ class TextNormalizer:
                         new_word = word
                     else:
                         if settings.preserve_punctuation_emphasis:
-                            if settings.punctuation_emphasis_list:
-                                TextNormalizer.__reconstruct_regex(settings.punctuation_emphasis_list)
+                            TextNormalizer.__reconstruct_regex(settings.punctuation_emphasis_list)
                             filtered_word = TextNormalizer.__set_punctuation_emphasis(
                                 word, settings.punctuation_emphasis_level)
-                            new_word = word = filtered_word if filtered_word else word
+                            new_word = filtered_word if filtered_word else word
                         pos_tag = pos_tagged_word[1]
                         if settings.enable_pos_tag_filter:
                             if pos_tag not in settings.pos_tag_map:
@@ -112,7 +111,7 @@ class TextNormalizer:
     @classmethod
     def __reconstruct_regex(cls, emphasis_list: str) -> type(None):
         cls.PUNCTUATION_REGEX_STRING = "[{}]".format('|'.join(re.escape(emphasis_list)))
-        cls.WORD_PUNCTUATION_REGEX_STRING = "\w+" + cls.PUNCTUATION_REGEX_STRING + "+"
+        cls.WORD_PUNCTUATION_REGEX_STRING = "(\w+[-|'|.])*\w+" + cls.PUNCTUATION_REGEX_STRING + "+"
         cls.PUNCTUATION_REGEX = re.compile(pattern=cls.PUNCTUATION_REGEX_STRING + "+")
         cls.WORD_PUNCTUATION_REGEX = re.compile(pattern=cls.WORD_PUNCTUATION_REGEX_STRING)
 
@@ -120,17 +119,15 @@ class TextNormalizer:
     def __set_punctuation_emphasis(cls, word: str, emphasis_level: int) -> str:
         if cls.WORD_PUNCTUATION_REGEX.fullmatch(string=word):
             after_word_divider = None
-            for match in cls.PUNCTUATION_REGEX.finditer(string=word):
-                after_word_divider = match.span()[0]
+            for match in re.finditer(pattern="\w+", string=word):
+                after_word_divider = match.span()[1]
             word_part = word[:after_word_divider]
             punctuation_part = word[after_word_divider:]
             return word if len(punctuation_part) >= emphasis_level else word_part
 
-        # for words that have punctuations not included in the emphasis list
-        modified_sc_regex_compiled = re.compile(cls.SPECIAL_CHARACTER_REGEX_STRING
-                                                .replace("-", "").replace("'", "").replace(".", ""))
-        for match in modified_sc_regex_compiled.finditer(string=word):
-            return word[:match.span()[0]]
+        for match in re.finditer(pattern="\w+", string=word):
+            word = word[:match.span()[1]]
+        return word
 
     @staticmethod
     def __remove_html_tags(text: str) -> str:
@@ -169,7 +166,7 @@ class TextNormalizer:
 
     @staticmethod
     def __clean_left_surrounding_text(word: str) -> str:
-        for match in re.finditer(pattern="\w+", string=word):
+        for match in re.finditer(pattern="\w", string=word):
             first_letter = match.span()[0]
             return word[first_letter:]
 
@@ -247,7 +244,7 @@ class TextNormalizer:
             self._preserve_wordform = False
 
             self._preserve_special_character = False
-            self._preserve_punctuation_emphasis = False,
+            self._preserve_punctuation_emphasis = False
             self._punctuation_emphasis_list = TextNormalizer.DEFAULT_PUNCTUATION_EMPHASIS
             self._punctuation_emphasis_level = 1
 
@@ -387,9 +384,9 @@ class TextNormalizer:
 
     PUNCTUATION_REGEX_STRING = "[{}]".format('|'.join(re.escape(DEFAULT_PUNCTUATION_EMPHASIS)))
 
-    WORD_PUNCTUATION_REGEX_STRING = "\w+" + PUNCTUATION_REGEX_STRING + "+"
-
     SPECIAL_CHARACTER_REGEX_STRING = "[{}]".format(re.escape(string.punctuation))
+
+    WORD_PUNCTUATION_REGEX_STRING = "(\w+[-|'|.])*\w+" + PUNCTUATION_REGEX_STRING + "+"
 
     SPECIAL_CHARACTER_REGEX = re.compile(pattern=SPECIAL_CHARACTER_REGEX_STRING)
 
@@ -613,6 +610,8 @@ class SentiText:
 settings = (TextNormalizer.Settings()
             .set_independent_properties(minimum_word_length=2, request_tokens=True, preserve_lettercase=True)
             .set_special_character_properties(punctuation_emphasis_level=4)
-            .set_word_contraction_properties())
-textNormalizer = TextNormalizer("I hope this group of film-makers never re-unites. ever again. IT SUCKS >:(", settings)
+            .set_word_contraction_properties()
+            .set_pos_tag_properties(enable_pos_tag_filter=False))
+textNormalizer = TextNormalizer("I hope this group of film-makers!!!! never re-unites. ever again. IT SUCKS????  >:(",
+                                settings)
 print(textNormalizer().append("Here you go! :)"))
