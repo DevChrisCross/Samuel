@@ -405,7 +405,7 @@ class TextSummarizer:
             GRASSHOPPER = "G"
             MAXIMAL_MARGINAL_RELEVANCE = "M"
 
-        def __init__(self, ranking_mode: Rank = Rank.DIVRANK, reranking_mode: Rerank = None):
+        def __init__(self, ranking_mode: Rank = Rank.DIVRANK, reranking_mode: Rerank = None, query: str = None):
             Rank = self.__class__.Rank
             Rerank = self.__class__.Rerank
 
@@ -436,7 +436,10 @@ class TextSummarizer:
                 if reranking_mode.name == ranking_mode.name == Rerank.GRASSHOPPER.name:
                     return
                 self._reranking_mode = reranking_mode
-                self._ranking_map[reranking_mode.name]["setter"]()
+                if query and reranking_mode.name == Rerank.MAXIMAL_MARGINAL_RELEVANCE.name:
+                    self._ranking_map[reranking_mode.name]["setter"](query)
+                else:
+                    self._ranking_map[reranking_mode.name]["setter"]()
 
         def __str__(self):
             return ("Rank Mode: " + self._ranking_mode.name
