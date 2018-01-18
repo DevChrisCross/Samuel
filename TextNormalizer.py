@@ -608,11 +608,11 @@ class SentiText:
 #     minimum_word_length=2, enable_pos_tag_filter=True, preserve_lettercase=True, correct_spelling=True))
 
 
-settings = (TextNormalizer.Settings()
-            .set_independent_properties(minimum_word_length=2, request_tokens=True, preserve_lettercase=True)
-            .set_special_character_properties(punctuation_emphasis_level=4)
-            .set_word_contraction_properties()
-            .set_pos_tag_properties(enable_pos_tag_filter=False))
-textNormalizer = TextNormalizer("I hope this group of film-makers!!!! never re-unites. ever again. IT SUCKS????  >:(",
-                                settings)
-print(textNormalizer().append("Here you go! :)"))
+# settings = (TextNormalizer.Settings()
+#             .set_independent_properties(minimum_word_length=2, request_tokens=True, preserve_lettercase=True)
+#             .set_special_character_properties(punctuation_emphasis_level=4)
+#             .set_word_contraction_properties()
+#             .set_pos_tag_properties(enable_pos_tag_filter=False))
+# textNormalizer = TextNormalizer("I hope this group of film-makers!!!! never re-unites. ever again. IT SUCKS????  >:(",
+#                                 settings)
+# print(textNormalizer().append("Here you go! :)"))

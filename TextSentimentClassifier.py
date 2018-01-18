@@ -57,9 +57,10 @@ class SentimentIntensityAnalyzer:
 
         word_valence = list()
         words_with_emoticons = sentitext.words_and_emoticons
-        print(words_with_emoticons)
+        # print(words_with_emoticons)
 
         for i, item in enumerate(words_with_emoticons):
+
             valence = 0
             if ((i < len(words_with_emoticons) - 1
                  and words_with_emoticons[i].lower() == "kind" and words_with_emoticons[i+1].lower() == "of")
@@ -68,7 +69,7 @@ class SentimentIntensityAnalyzer:
                 continue
             word_valence.append(self.sentiment_valence(valence, sentitext, item, i))
         word_valence = self._but_word_check(words_with_emoticons, word_valence)
-        print(word_valence)
+        # print(word_valence)
         return self.score_valence(word_valence, text)
 
     def sentiment_valence(self, valence: float, sentitext, item: str, current_word_index: int):
@@ -232,7 +233,7 @@ class SentimentIntensityAnalyzer:
             elif total_valence < 0:
                 total_valence -= punct_emph_amplifier
 
-            print(total_valence)
+            # print(total_valence)
 
             def normalize_valence(score, alpha: int = 15):
                 norm_score = score / math.sqrt((score * score) + alpha)
@@ -326,23 +327,23 @@ def unsupervised_extractor(review: str, threshold: float = 0.1, verbose: bool = 
         negative = str(round(scores['neg'], 2)*100) + '%'
         neutral = str(round(scores['neu'], 2)*100) + '%'
         compound = str(round(scores['compound'], 2) * 100) + '%'
-        print("Compound " + str(compound))
-        print("Positive " + str(positive))
-        print("Final " + str(final))
-        print("Negative " + str(negative))
-        print("Neutral " + str(neutral))
+        # print("Compound " + str(compound))
+        # print("Positive " + str(positive))
+        # print("Final " + str(final))
+        # print("Negative " + str(negative))
+        # print("Neutral " + str(neutral))
     return final_sentiment
 
 sample_data = [("I hope this group of highly film-makers!!!! never re-unites. ever again. IT SUCKS!!!! >:(", "negative"),
               ("a mesmerizing film that certainly keeps your attention... Ben Daniels is fascinating (and courageous) to watch..", "positive"),
               ("Worst horror film ever but funniest film ever rolled in one you have got to see this film it is so cheap it is unbeliaveble but you have to see it really!!!! P.s watch the carrot", "positive")]
 
-for review, review_sentiment in sample_data:
-    print("Review")
-    print(review)
-    print("Labeled Sentiment: ", review_sentiment)
-    final_sentiment = unsupervised_extractor(review, threshold=0.1, verbose=True)
-    print("Final Sentiment: " + final_sentiment)
-    print("-" * 60)
+# for review, review_sentiment in sample_data:
+#     print("Review")
+#     print(review)
+#     print("Labeled Sentiment: ", review_sentiment)
+#     final_sentiment = unsupervised_extractor(review, threshold=0.1, verbose=True)
+#     print("Final Sentiment: " + final_sentiment)
+#     print("-" * 60)
 
 

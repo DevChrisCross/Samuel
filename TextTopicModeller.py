@@ -4,7 +4,9 @@ from gensim.corpora import Dictionary
 import pyLDAvis.gensim
 import json
 import gensim
+
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
+
 
 # TODO for refactoring, make a consistent environment
 def topic_modelling(normalized_text, visualize=False):
@@ -25,8 +27,6 @@ def topic_modelling(normalized_text, visualize=False):
             return visual
     else:
         return lda_model.get_topics()
-
-
 
 # lda = topic_modelling(corpus['normalized'], True)
 # def __extract_keyphrase(text, n_gram=2, keywords=4, correct_sent=False, tokenize_sent=True):

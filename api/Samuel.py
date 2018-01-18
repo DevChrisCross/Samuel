@@ -6,110 +6,78 @@ from TextSentimentClassifier import unsupervised_extractor
 from warnings import filterwarnings
 from enum import Enum
 from typing import Type
-
 from pprint import pprint
 
 filterwarnings(action='ignore')
 
-def init():
-    Rank = TextSummarizer.Settings.Rank
-    Rerank = TextSummarizer.Settings.Rerank
 
+def init(KEY: str):
     def parse_enum(enumeration: Type[Enum]):
-        return str({en.name: en.name for en in enumeration})
+        return {en.name: en.value for en in enumeration}
 
-    return{
-        'Rank': parse_enum(Rank),
-        'Rerank': parse_enum(Rerank),
-        'Language': parse_enum(Language)
+    return {
+        'Rank': parse_enum(TextSummarizer.Settings.Rank),
+        'Rerank': parse_enum(TextSummarizer.Settings.Rerank),
+        'Language': parse_enum(Language),
+        'KEY': KEY
     }
 
 
 def api(data):
+    def check_param(default, param: str):
+        return default if param not in data else data[param]
 
-    def check_param(default,param,value):
-        return default if param not in data else value
+    text = data['text']
 
-    corpus = data['corpus']
-
-    translate_from = check_param(Language.TAGALOG,"translate_from",data['translate_from'])
-    translate_to = check_param(Language.ENGLISH, "translate_to", data['translate_to'])
-    corpus = translate(corpus, translate_from, translate_to)
-
-    # For Unsupervised Extractor
-    threshold_extractor = 0.1 if 'threshold_extractor' not in data else data['threshold_extractor']
-    verbose = False if 'verbose' not in data else data['verbose']
-
-    polarity = unsupervised_extractor(corpus, threshold_extractor, verbose)
-
-    # For Topic Modelling
-    visualize = False if 'visualize' not in data else data['visualize']
-
-    dashboard = build_dashboard(topic_modelling(normalized_corpus['normalized'], visualize))
-
-    # For Summarizer
-    summary_length = data['summary_length']
-    threshold_summarizer = 0.001 if 'threshold_summarizer' not in data else data['threshold_summarizer']
-    rank = "D" if 'rank' not in data else data['rank']
-    rerank = False if 'rerank' not in data else data['rerank']
-    query = None if 'query' not in data else data['query']
-    sort_score = False if 'sort_score' not in data else data['sort_score']
-    #split_sent = False if 'split_sent' not in data else data['split_sent']
-    #correct_sent = False if 'correct_sent' not in data else data['correct_sent']
-    #tokenize_sent = True if 'tokenize_sent' not in data else data['tokenize_sent']
-
-    summarized_corpus = summarizer(corpus, summary_length, threshold_summarizer, rank, rerank, query, sort_score,
-                                   split_sent,
-                                   correct_sent, tokenize_sent)
+    # TEXT TRANSLATOR
+    translate_from = check_param(Language.TAGALOG.value, "translate_from")
+    translate_to = check_param(Language.ENGLISH.value, "translate_to")
+    text = translate(text, translate_from, translate_to)
 
     # TEXT NORMALIZER
-    request_tokens = False
-    preserve_lettercase = False
-    minimum_word_length = 1
+    normalizer_settings = (TextNormalizer.Settings()
+        .set_independent_properties(minimum_word_length=2, request_tokens=True, preserve_lettercase=True)
+        .set_special_character_properties(punctuation_emphasis_level=4)
+        .set_word_contraction_properties())
+    normalized_text = TextNormalizer(text, normalizer_settings)
 
-    expand_word_contraction = False
-    contraction_map = TextNormalizer.DEFAULT_CONTRACTION_MAP
-    preserve_stopword = False
+    # TEXT SENTIMENT CLASSIFIER
+    threshold_classifier = check_param(0.1, "threshold_classifier")
+    verbose = check_param(False, "verbose")
+    polarity = unsupervised_extractor(text, threshold_classifier, verbose)
 
-    enable_pos_tag_filter = True
-    pos_tag_map = TextNormalizer.DEFAULT_POS_TAG_MAP
-    correct_spelling = False
-    preserve_wordform = False
-
-    preserve_special_character = False
-    preserve_punctuation_emphasis = False
-    punctuation_emphasis_list = TextNormalizer.DEFAULT_PUNCTUATION_EMPHASIS
-    punctuation_emphasis_level = 1
-
-    settings = (TextNormalizer.Settings()
-        .set_independent_properties(minimum_word_length, request_tokens, preserve_lettercase)
-        .set_word_contraction_properties(expand_word_contraction, preserve_stopword, contraction_map)
-        .set_special_character_properties(preserve_special_character, preserve_punctuation_emphasis,
-                                          punctuation_emphasis_level, punctuation_emphasis_list)
-        .set_pos_tag_properties(preserve_wordform, correct_spelling, enable_pos_tag_filter, pos_tag_map))
-    normalized_corpus = TextNormalizer(corpus, settings)
+    # TEXT TOPIC MODELLER
+    visualize = check_param(False, "visualize")
+    dashboard = build_dashboard(topic_modelling(normalized_text().normalized_text, visualize))
 
     # TEXT SUMMARIZER
-    Rank = TextSummarizer.Settings.Rank
-    Rerank = TextSummarizer.Settings.Rerank
-
     summary_length = data['summary_length']
-    sort_by_score = False if 'sort_score' not in data else data['sort_score']
-    threshold_summarizer = 0.001 if 'threshold_summarizer' not in data else data['threshold_summarizer']
-    rank = "D" if 'rank' not in data else data['rank']
-    rerank = False if 'rerank' not in data else data['rerank']
-    query = None if 'query' not in data else data['query']
-    RankType =
-    RerankType =
-    tsSettings = TextSummarizer.Settings(RankType, RerankType)
+    sort_by_score = check_param(False, "sort_by_score")
+    rank = check_param("D", "rank")
+    query = check_param(None, "query")
 
+    def summarizer_settings():
+        Rank = TextSummarizer.Settings.Rank
+        Rerank = TextSummarizer.Settings.Rerank
+        _rank = Rank.DIVRANK
+        _rerank = Rerank.GRASSHOPPER
 
-    rank_map = {
-        Rank.DIVRANK.name: {}
-    }
+        if rank == Rank.DIVRANK.value:
+            _rank = Rank.DIVRANK
+        elif rank == Rank.LEXRANK.value:
+            _rank = Rank.LEXRANK
+        elif rank == Rank.GRASSHOPPER.value:
+            _rank = Rank.GRASSHOPPER
+
+        if query is not None:
+            return TextSummarizer.Settings(_rank, Rerank.MAXIMAL_MARGINAL_RELEVANCE, query)
+        else:
+            return TextSummarizer.Settings(_rank, _rerank)
+
+    summarize_text = TextSummarizer(normalized_text, summarizer_settings())
 
     return {
-        'summarized_text': summarized_corpus['text'],
+        'summarized_text': summarize_text(summary_length, sort_by_score).summary_text,
         'polarity': polarity,
         'dashboard': dashboard
     }

@@ -548,9 +548,9 @@ Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's 
 Like other creatures, Dragons are generated randomly in the world and will engage in combat.
 """
 
-tn = TextNormalizer(document2)
-summarizer = TextSummarizer(tn())
-print(summarizer(summary_length=5))
+# tn = TextNormalizer(document2)
+# summarizer = TextSummarizer(tn())
+# print(summarizer(summary_length=5))
 # pprint(Summarizer(tn()).summarizer(summary_length=5, rank_mode="D", rerank=True, query="game engine").summary_text)
 # pprint(summarizer(document1, summary_length=3, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
 # pprint(extract_keyphrase(document2))

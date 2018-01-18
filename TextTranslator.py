@@ -11,10 +11,9 @@ class Language(Enum):
     ENGLISH = "en"
 
 
-def translate(corpus: str, translate_from: "Language" = Language.ENGLISH, translate_to: "Language" = Language.TAGALOG):
-    translated_corpus = translator.translate(corpus, translate_from, translate_to)
+def translate(corpus: str, translate_from=Language.TAGALOG.value, translate_to=Language.ENGLISH.value):
+    translated_corpus = translator.translate(corpus, translate_to, translate_from)
     return translated_corpus.text
-
 
 # movie_review = u"eto ung isa sa movie na hinding hindi ko makakalimutan, every scene ay talagang maganda. Siguradong numero uno to sa takilya"
 # hugot = u"Minsan may mga bagay talaga na mawawala at hindi mo ito mapipigilan. " \
