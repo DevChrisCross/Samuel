@@ -28,7 +28,7 @@ def api(data):
     def check_param(default, param: str):
         return default if param not in data else data[param]
 
-    text = data['text']
+    text = data['corpus']
 
     # TEXT TRANSLATOR
     translate_from = check_param(Language.TAGALOG.value, "translate_from")
