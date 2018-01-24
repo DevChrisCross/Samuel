@@ -94,6 +94,8 @@ class TextSummarizer:
         params = settings.ranking_mode["constant_parameters"]
         num_of_sentences = len(self._sentences_score)
         cosine_matrix = self._cosine_matrix[:]
+        cosine_matrix = [[(1 if cosine_matrix[i][j] > params["cos_threshold"] else 0) for j in range(num_of_sentences)]
+                         for i in range(num_of_sentences)]
         initial_state = np.full(shape=num_of_sentences, fill_value=1 / num_of_sentences)
 
         def generate_lexrank(old_state):
@@ -103,7 +105,7 @@ class TextSummarizer:
             for i in range(__length):
                 summation_j = 0
                 for j in range(__length):
-                    summation_k = sum(cosine_matrix[j])
+                    summation_k = sum([cosine_matrix[k][j] for k in range(__length)])
                     summation_j += (old_state[j] * cosine_matrix[i][j]) / summation_k
                 new_state[i] = (damping_factor / __length) + ((1 - damping_factor) * summation_j)
             return new_state
@@ -461,9 +463,10 @@ class TextSummarizer:
                 "cos_threshold": cos_threshold
             }
 
-        def set_lexrank_parameters(self, damping_factor: float = 0.85) -> type(None):
+        def set_lexrank_parameters(self, damping_factor: float = 0.85, cos_threshold: float = 0.1) -> type(None):
             self._ranking_map[self.__class__.Rank.LEXRANK.name]["constant_parameters"] = {
-                "damping_factor": damping_factor
+                "damping_factor": damping_factor,
+                "cos_threshold": cos_threshold
             }
 
         def set_grasshopper_parameters(self, lambda_value: float = 0.5, alpha_value: float = 0.25,
@@ -518,19 +521,32 @@ class TextSummarizer:
             self._ranking_map[self._reranking_mode.name]["setter"]()
 
 
-document1 = [
-    '''iraqi vice president taha yassin ramadan announced today, sunday, that iraq refuses to back down from its decision to stop cooperating with disarmament inspectors before its demands are met.''',
-    '''iraqi vice president taha yassin ramadan announced today, thursday, that iraq rejects cooperating with the united nations except on the issue of lifting the blockade imposed upon it since the year 1990.''',
-    '''ramadan told reporters in baghdad that "iraq cannot deal positively with whoever represents the security council unless there was a clear stance on the issue of lifting the blockade off of it.''',
-    '''baghdad had decided late last october to completely cease cooperating with the inspectors of the united nations special commision (unscom), in charge of disarming iraq's weapons, and whose work became very limited since the fifth of august, and announced it will not resume its cooperation with the commission even if it were subjected to a military operation.''',
-    '''the russian foreign minister, igor ivanov, warned today, wednesday against using force against iraq, which will destroy, according to him, seven years of difficult diplomatic work and will complicate the regional situation in the area.''',
-    '''ivanov contended that carrying out air strikes against iraq, who refuses to cooperate with the united nations inspectors, "will end the tremendous work achieved by the international group during the past seven years and will complicate the situation in the region."''',
-    '''nevertheless, ivanov stressed that baghdad must resume working with the special commission in charge of disarming the iraqi weapons of mass destruction (unscom).''',
-    '''the special representative of the united nations secretary-general in baghdad, prakash shah, announced today, wednesday, after meeting with the iraqi deputy prime minister tariq aziz, that iraq refuses to back down from its decision to cut off cooperation with the disarmament inspectors.''',
-    '''british prime minister tony blair said today, sunday, that the crisis between the international community and iraq "did not end" and that britain is still ready, prepared, and able to strike iraq."''',
-    '''in a gathering with the press held at the prime minister's office, blair contended that the crisis with iraq " will not end until iraq has absolutely and unconditionally respected its commitments" towards the united nations.''',
-    '''a spokesman for tony blair had indicated that the british prime minister gave permission to british air force tornado planes stationed to kuwait to join the aerial bombardment against iraq.'''
-]
+Rank = TextSummarizer.Settings.Rank
+Rerank = TextSummarizer.Settings.Rerank
+
+document1 = '''Iraqi vice president taha yassin ramadan announced today, sunday, that iraq refuses to back down from its
+decision to stop cooperating with disarmament inspectors before its demands are met. iraqi vice president taha yassin
+ramadan announced today, thursday, that iraq rejects cooperating with the united nations except on the issue of lifting 
+the blockade imposed upon it since the year 1990. Ramadan told reporters in baghdad that "iraq cannot deal positively 
+with whoever represents the security council unless there was a clear stance on the issue of lifting the blockade off 
+of it. Baghdad had decided late last october to completely cease cooperating with the inspectors of the united nations 
+special commision (unscom), in charge of disarming iraq's weapons, and whose work became very limited since the fifth 
+of august, and announced it will not resume its cooperation with the commission even if it were subjected to a military 
+operation. The russian foreign minister, igor ivanov, warned today, wednesday against using force against iraq, which 
+will destroy, according to him, seven years of difficult diplomatic work and will complicate the regional situation in 
+the area. Ivanov contended that carrying out air strikes against iraq, who refuses to cooperate with the united nations 
+inspectors, "will end the tremendous work achieved by the international group during the past seven years and will 
+complicate the situation in the region." Nevertheless, ivanov stressed that baghdad must resume working with the special 
+commission in charge of disarming the iraqi weapons of mass destruction (unscom). The special representative of the 
+united nations secretary-general in baghdad, prakash shah, announced today, wednesday, after meeting with the iraqi 
+deputy prime minister tariq aziz, that iraq refuses to back down from its decision to cut off cooperation with the 
+disarmament inspectors. British prime minister tony blair said today, sunday, that the crisis between the international 
+community and iraq "did not end" and that britain is still ready, prepared, and able to strike iraq." In a gathering 
+with the press held at the prime minister's office, blair contended that the crisis with iraq " will not end until iraq 
+has absolutely and unconditionally respected its commitments" towards the united nations. A spokesman for tony blair had
+indicated that the british prime minister gave permission to british air force tornado planes stationed to kuwait to 
+join the aerial bombardment against iraq.'''
+
 
 document2 = """
 The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
@@ -548,9 +564,9 @@ Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's 
 Like other creatures, Dragons are generated randomly in the world and will engage in combat.
 """
 
-# tn = TextNormalizer(document2)
-# summarizer = TextSummarizer(tn())
-# print(summarizer(summary_length=5))
+tn = TextNormalizer(document2)
+summarizer = TextSummarizer(tn(), TextSummarizer.Settings(Rank.LEXRANK))
+pprint(summarizer(summary_length=5).summary_text)
 # pprint(Summarizer(tn()).summarizer(summary_length=5, rank_mode="D", rerank=True, query="game engine").summary_text)
 # pprint(summarizer(document1, summary_length=3, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
 # pprint(extract_keyphrase(document2))
