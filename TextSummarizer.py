@@ -183,52 +183,67 @@ class TextSummarizer:
         You can check the algorithm at http://pages.cs.wisc.edu/~jerryzhu/pub/grasshopper.pdf
         """
 
-        def reconstruct_cosine_matrix():
-            alpha_value = params["alpha_value"]
-            lambda_value = params["lambda_value"]
-            cos_threshold = params["cos_threshold"]
-
-            cosine_matrix = self._cosine_matrix[:]
-            prior_distribution = ([ranked_sentences[i][settings.ranking_mode["name"]] for i in range(num_of_sentences)]
-                                  if settings.reranking_mode["name"] == settings.Rerank.GRASSHOPPER
-                                  else [np.power(i+1, alpha_value*-1) for i in range(num_of_sentences)])
-            vector_ones = np.full(shape=num_of_sentences, fill_value=1)
-            distribution_matrix = np.outer(vector_ones, prior_distribution)
-            distribution_matrix = np.multiply(distribution_matrix, (1-lambda_value))
-
-            cosine_matrix = [[(1 if cosine_matrix[i][j] > cos_threshold else 0) for j in range(num_of_sentences)]
-                             for i in range(num_of_sentences)]
-            cosine_matrix = [np.divide(cosine_matrix[i], np.sum(cosine_matrix[i])) for i in range(num_of_sentences)]
-            cosine_matrix = np.multiply(cosine_matrix, lambda_value)
-            cosine_matrix = np.add(cosine_matrix, distribution_matrix).tolist()
-            return cosine_matrix
-
         settings = self._settings
         params = settings.parameters_of(settings.Rank.GRASSHOPPER)
         num_of_sentences = len(self._sentences_score)
-        ranked_sentences = self._sentences_score
 
-        cosine_matrix = reconstruct_cosine_matrix()
-        grasshopper_scores = list()
-        rank_iteration = int(np.ceil(num_of_sentences/2))
-        distribution = np.full(shape=num_of_sentences, fill_value=1/num_of_sentences)
+        alpha_value = params["alpha_value"]
+        lambda_value = params["lambda_value"]
+        cos_threshold = params["cos_threshold"]
 
-        def generate_grank(old_state):
-            return np.dot(self._cosine_matrix, old_state)
+        cosine_matrix = self._cosine_matrix[:]
+        cosine_matrix = [[(
+            1 if np.dot(cosine_matrix[i], cosine_matrix[j]) / (np.linalg.norm(cosine_matrix[i]) *
+                                                               np.linalg.norm(cosine_matrix[j])) > cos_threshold
+            else 0) for j in range(num_of_sentences)] for i in range(num_of_sentences)]
+        cosine_matrix = [np.divide(cosine_matrix[i], sum(cosine_matrix[i])) for i in range(num_of_sentences)]
 
-        for i in range(rank_iteration):
-            stationary_distribution = self.__power_method(distribution, generate_grank, settings.threshold)
-            highest_score = stationary_distribution.index(max(stationary_distribution))
-            grasshopper_scores.append(highest_score)
-            cosine_matrix.pop(grasshopper_scores[i])
+        if settings.reranking_mode:
+            ranked_sentences = self._sentences_score
+            prior_distribution = [ranked_sentences[i][settings.ranking_mode["name"]] for i in range(num_of_sentences)]
+            prior_distribution = np.divide(prior_distribution, sum(prior_distribution))
+        else:
+            prior_distribution = [np.power(i + 1, alpha_value * -1) for i in range(num_of_sentences)]
 
-            absorbing_markov = [(1 if j == grasshopper_scores[i] else 0) for j in range(num_of_sentences)]
-            cosine_matrix.insert(grasshopper_scores[i], absorbing_markov)
-            distribution = stationary_distribution
+        all_one_vector = np.full(shape=num_of_sentences, fill_value=1)
+        teleporting_random_walk = np.multiply(lambda_value, cosine_matrix)
+        teleporting_random_walk += np.multiply((1 - lambda_value), np.outer(all_one_vector, prior_distribution))
+        markov_chain_tracker = [i for i in range(num_of_sentences)]
+
+        def absorb_state(index, num_of_ranked):
+            sentence_index = markov_chain_tracker.pop(index)
+            markov_chain_tracker.insert(0, sentence_index)
+
+            cosine_matrix[index] = [1 if index == i else 0 for i in range(num_of_sentences)]
+            sentence_vector = cosine_matrix.pop(index)
+            cosine_matrix.insert(0, sentence_vector)
+
+            submatrix_q = [[cosine_matrix[i][j] for j in range(num_of_ranked, num_of_sentences)]
+                           for i in range(num_of_ranked, num_of_sentences)]
+            identity_matrix = np.diag([1 for _ in range(num_of_ranked, num_of_sentences)])
+            fundamental_matrix = np.linalg.inv((identity_matrix - submatrix_q))
+            all_one_vector = np.full(shape=num_of_sentences - num_of_ranked, fill_value=1)
+            visit_n = np.dot(fundamental_matrix, all_one_vector) / (num_of_sentences - num_of_ranked)
+            return visit_n.tolist()
+
+        stationary_distribution = self.__power_method(prior_distribution,
+                                                      lambda state: np.dot(teleporting_random_walk, state),
+                                                      settings.threshold)
+
+        g1 = stationary_distribution.index(max(stationary_distribution))
+        num_of_ranked = 1
+        visit_n = absorb_state(g1, num_of_ranked)
+        for i in range(1, num_of_sentences):
+            num_of_ranked += 1
+            sentence_index = visit_n.index(max(visit_n))
+            sentence_index += num_of_ranked - 1
+            visit_n = absorb_state(sentence_index, num_of_ranked)
+        print(markov_chain_tracker)
+        markov_chain_tracker = [num_of_sentences - markov_chain_tracker[i] - 1 for i in range(num_of_sentences)]
+        print(markov_chain_tracker)
 
         for i in range(num_of_sentences):
-            self._sentences_score[i][settings.Rank.GRASSHOPPER.name] = (
-                len(grasshopper_scores) - grasshopper_scores.index(i) if i in grasshopper_scores else -1)
+            self._sentences_score[i][settings.Rank.GRASSHOPPER.name] = markov_chain_tracker.index(i)
 
     def __maximal_marginal_relevance(self):
         """
@@ -563,8 +578,8 @@ Like other creatures, Dragons are generated randomly in the world and will engag
 """
 
 tn = TextNormalizer(document2)
-summarizer = TextSummarizer(tn(), TextSummarizer.Settings(Rank.LEXRANK))
-sn = summarizer(summary_length=3)
+summarizer = TextSummarizer(tn(), TextSummarizer.Settings(Rank.GRASSHOPPER))
+sn = summarizer(summary_length=5)
 pprint(sn.sentences_score)
 pprint(sn.summary_text)
 # pprint(Summarizer(tn()).summarizer(summary_length=5, rank_mode="D", rerank=True, query="game engine").summary_text)
