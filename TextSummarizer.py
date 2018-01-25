@@ -93,26 +93,26 @@ class TextSummarizer:
         settings = self._settings
         params = settings.ranking_mode["constant_parameters"]
         num_of_sentences = len(self._sentences_score)
+        damping_factor = params["damping_factor"]
+
         cosine_matrix = self._cosine_matrix[:]
-        cosine_matrix = [[(1 if cosine_matrix[i][j] > params["cos_threshold"] else 0) for j in range(num_of_sentences)]
+        cosine_matrix = [[cosine_matrix[i][j] / sum([cosine_matrix[k][j] for k in range(num_of_sentences)])
+                          for j in range(num_of_sentences)]
                          for i in range(num_of_sentences)]
+        cosine_matrix = [np.divide(cosine_matrix[i], sum(cosine_matrix[i])) for i in range(num_of_sentences)]
+
+        uniform_matrix = np.full(shape=[num_of_sentences, num_of_sentences], fill_value=1 / num_of_sentences)
+        transition_matrix = np.multiply(uniform_matrix, damping_factor)
+        transition_matrix += np.multiply((1 - damping_factor), cosine_matrix)
+
         initial_state = np.full(shape=num_of_sentences, fill_value=1 / num_of_sentences)
 
         def generate_lexrank(old_state):
-            damping_factor = params["damping_factor"]
-            __length = len(old_state)
-            new_state = np.zeros(shape=__length)
-            for i in range(__length):
-                summation_j = 0
-                for j in range(__length):
-                    summation_k = sum([cosine_matrix[k][j] for k in range(__length)])
-                    summation_j += (old_state[j] * cosine_matrix[i][j]) / summation_k
-                new_state[i] = (damping_factor / __length) + ((1 - damping_factor) * summation_j)
-            return new_state
+            return np.dot(transition_matrix, old_state)
 
         lexrank_scores = TextSummarizer.__power_method(initial_state, generate_lexrank, settings.threshold)
         for i in range(num_of_sentences):
-            self._sentences_score[i][settings.ranking_mode["name"]] = float("{0:.3f}".format(lexrank_scores[i]))
+            self._sentences_score[i][settings.ranking_mode["name"]] = float("{0:.6f}".format(lexrank_scores[i]))
 
     def __divrank(self):
         """
@@ -131,43 +131,41 @@ class TextSummarizer:
         settings = self._settings
         params = settings.ranking_mode["constant_parameters"]
         num_of_sentences = len(self._sentences_score)
-        cosine_matrix = self._cosine_matrix[:]
 
+        alpha_value = params["alpha_value"]
+        beta_value = params["beta_value"]
+        lambda_value = params["lambda_value"]
+
+        cosine_matrix = self._cosine_matrix[:]
         cosine_matrix = [[(1 if cosine_matrix[i][j] > params["cos_threshold"] else 0) for j in range(num_of_sentences)]
                          for i in range(num_of_sentences)]
-        cosine_matrix = [np.divide(cosine_matrix[i], np.sum(cosine_matrix[i])) for i in range(num_of_sentences)]
+        cosine_matrix = [np.divide(cosine_matrix[i], sum(cosine_matrix[i])) for i in range(num_of_sentences)]
+
+        organic_matrix = [[(1-lambda_value) if i == j else (alpha_value*cosine_matrix[i][j])
+                           for j in range(num_of_sentences)]
+                          for i in range(num_of_sentences)]
+
+        prior_distribution = [np.power(i + 1, beta_value * -1) if beta_value else (1 / num_of_sentences)
+                              for i in range(num_of_sentences)]
+
+        transition_matrix = np.ndarray(shape=(num_of_sentences, num_of_sentences), dtype=float)
+        n_visit = np.full(shape=num_of_sentences, fill_value=1)
+        for i in range(num_of_sentences):
+            for j in range(num_of_sentences):
+                reinforced_walk_sum = sum([organic_matrix[i][k] * n_visit[k] for k in range(num_of_sentences)])
+                reinforced_walk = (organic_matrix[i][j] * n_visit[j]) / reinforced_walk_sum
+                transition_matrix[i, j] = ((1 - lambda_value) * prior_distribution[j]) + (lambda_value * reinforced_walk)
+                if cosine_matrix[i][j]:
+                    n_visit[j] += 1
+
         initial_state = np.full(shape=num_of_sentences, fill_value=1 / num_of_sentences)
 
         def generate_divrank(old_state):
-            alpha_value = params["alpha_value"]
-            beta_value = params["beta_value"]
-            lambda_value = params["lambda_value"]
-
-            def organic_value(x, y):
-                return (1 - alpha_value) if x == y else (alpha_value * cosine_matrix[x][y])
-
-            __length = len(old_state)
-            new_state = np.zeros(shape=__length)
-            visited_n = np.full(shape=__length, fill_value=1)
-
-            for i in range(__length):
-                summation_j = 0
-                for j in range(__length):
-                    summation_k = 0
-                    for k in range(__length):
-                        summation_k += (organic_value(j, k) * old_state[k] * visited_n[k])
-                        if organic_value(j, k):
-                            visited_n[k] += 1
-                    summation_j += (old_state[j] * ((organic_value(j, i) * visited_n[i]) / summation_k))
-                    if organic_value(j, i):
-                        visited_n[i] += 1
-                prior_distribution = np.power(i+1, beta_value*-1) if beta_value else (1/__length)
-                new_state[i] = ((1 - lambda_value) * prior_distribution) + (lambda_value * summation_j)
-            return new_state
+            return np.dot(transition_matrix, old_state)
 
         divrank_scores = TextSummarizer.__power_method(initial_state, generate_divrank, settings.threshold)
         for i in range(num_of_sentences):
-            self._sentences_score[i][settings.ranking_mode["name"]] = float("{0:.3f}".format(divrank_scores[i]))
+            self._sentences_score[i][settings.ranking_mode["name"]] = float("{0:.6f}".format(divrank_scores[i]))
 
     def __grasshopper(self):
         """
@@ -566,7 +564,9 @@ Like other creatures, Dragons are generated randomly in the world and will engag
 
 tn = TextNormalizer(document2)
 summarizer = TextSummarizer(tn(), TextSummarizer.Settings(Rank.LEXRANK))
-pprint(summarizer(summary_length=5).summary_text)
+sn = summarizer(summary_length=3)
+pprint(sn.sentences_score)
+pprint(sn.summary_text)
 # pprint(Summarizer(tn()).summarizer(summary_length=5, rank_mode="D", rerank=True, query="game engine").summary_text)
 # pprint(summarizer(document1, summary_length=3, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
 # pprint(extract_keyphrase(document2))
