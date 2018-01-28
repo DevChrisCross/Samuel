@@ -47,7 +47,7 @@ class TextSummarizer:
         rank = settings.Rank
         rank_function_map = {
             rank.DIVRANK.name: self.__divrank,
-            rank.LEXRANK.name: self.__lexrank,
+            rank.LEXRANK.name: self.__continuous_lexrank,
             rank.GRASSHOPPER.name: self.__grasshopper,
         }
         scorebase = settings.ranking_mode["name"]
@@ -76,7 +76,7 @@ class TextSummarizer:
                 + "\n" + ":"*200 + "\n[Settings]\n" + str(self._settings)
                 + "\n" + "-"*200 + "\n")
 
-    def __lexrank(self):
+    def __continuous_lexrank(self):
         """
         Lexical PageRank
         Computes the Lexrank for the corresponding given cosine matrix. A ranking algorithm which involves computing
@@ -144,6 +144,14 @@ class TextSummarizer:
         organic_matrix = [[(1-lambda_value) if i == j else (alpha_value*cosine_matrix[i][j])
                            for j in range(num_of_sentences)]
                           for i in range(num_of_sentences)]
+
+        # track Nt --------------------------------------------------------------------------------------------
+        # identity_matrix = np.diag([1 for _ in range(num_of_sentences)])
+        # pprint((identity_matrix - cosine_matrix))
+        # fundamental_matrix = np.linalg.inv((identity_matrix - cosine_matrix))
+        # all_one_vector = np.full(shape=num_of_sentences, fill_value=1)
+        # n_visit = np.dot(fundamental_matrix, all_one_vector)
+        # pprint(n_visit)
 
         prior_distribution = [np.power(i + 1, beta_value * -1) if beta_value else (1 / num_of_sentences)
                               for i in range(num_of_sentences)]
@@ -223,8 +231,9 @@ class TextSummarizer:
             identity_matrix = np.diag([1 for _ in range(num_of_ranked, num_of_sentences)])
             fundamental_matrix = np.linalg.inv((identity_matrix - submatrix_q))
             all_one_vector = np.full(shape=num_of_sentences - num_of_ranked, fill_value=1)
-            visit_n = np.dot(fundamental_matrix, all_one_vector) / (num_of_sentences - num_of_ranked)
-            return visit_n.tolist()
+            n_visit = np.dot(fundamental_matrix, all_one_vector) / (num_of_sentences - num_of_ranked)
+            print(n_visit)
+            return n_visit.tolist()
 
         stationary_distribution = self.__power_method(prior_distribution,
                                                       lambda state: np.dot(teleporting_random_walk, state),
@@ -238,12 +247,12 @@ class TextSummarizer:
             sentence_index = visit_n.index(max(visit_n))
             sentence_index += num_of_ranked - 1
             visit_n = absorb_state(sentence_index, num_of_ranked)
-        print(markov_chain_tracker)
         markov_chain_tracker = [num_of_sentences - markov_chain_tracker[i] - 1 for i in range(num_of_sentences)]
-        print(markov_chain_tracker)
 
         for i in range(num_of_sentences):
-            self._sentences_score[i][settings.Rank.GRASSHOPPER.name] = markov_chain_tracker.index(i)
+            self._sentences_score[i][settings.Rank.GRASSHOPPER.name] = (float("{0:.6f}".format(
+                    markov_chain_tracker.index(i) / max(markov_chain_tracker)
+            )))
 
     def __maximal_marginal_relevance(self):
         """
@@ -275,7 +284,7 @@ class TextSummarizer:
             min_mmr = min_sent[mmr_name]
             max_mmr = max_sent[mmr_name]
             for sentence in mmr_scores:
-                sentence[mmr_name] = float("{0:.3f}".format((sentence[mmr_name] - min_mmr) / (max_mmr - min_mmr)))
+                sentence[mmr_name] = float("{0:.6f}".format((sentence[mmr_name] - min_mmr) / (max_mmr - min_mmr)))
                 ranked_sentences.append(sentence)
 
         settings = self._settings

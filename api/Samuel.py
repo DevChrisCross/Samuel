@@ -36,10 +36,7 @@ def api(data):
     text = translate(text, translate_from, translate_to)
 
     # TEXT NORMALIZER
-    normalizer_settings = (TextNormalizer.Settings()
-        .set_independent_properties(minimum_word_length=2, request_tokens=True, preserve_lettercase=True)
-        .set_special_character_properties(punctuation_emphasis_level=4)
-        .set_word_contraction_properties())
+    normalizer_settings = (TextNormalizer.Settings())
     normalized_text = TextNormalizer(text, normalizer_settings)
 
     # TEXT SENTIMENT CLASSIFIER
@@ -162,9 +159,9 @@ text3 = "I have missed iOS a lot over the last 3 years and it feels good to be b
         "background upload, which makes no sense. Same goes for OneDrive. Overall, navigation around the OS is easy " \
         "and convenient. "
 
-testing = {
-    'text': text1+text2+text3,
-    'summary_length': 5
-}
-
-pprint(api(testing))
+# testing = {
+#     'text': text1+text2+text3,
+#     'summary_length': 5
+# }
+#
+# pprint(api(testing))
