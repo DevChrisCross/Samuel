@@ -232,7 +232,7 @@ class TextSummarizer:
             fundamental_matrix = np.linalg.inv((identity_matrix - submatrix_q))
             all_one_vector = np.full(shape=num_of_sentences - num_of_ranked, fill_value=1)
             n_visit = np.dot(fundamental_matrix, all_one_vector) / (num_of_sentences - num_of_ranked)
-            print(n_visit)
+            # print(n_visit)
             return n_visit.tolist()
 
         stationary_distribution = self.__power_method(prior_distribution,
@@ -586,11 +586,11 @@ Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's 
 Like other creatures, Dragons are generated randomly in the world and will engage in combat.
 """
 
-tn = TextNormalizer(document2)
-summarizer = TextSummarizer(tn(), TextSummarizer.Settings(Rank.GRASSHOPPER))
-sn = summarizer(summary_length=5)
-pprint(sn.sentences_score)
-pprint(sn.summary_text)
+# tn = TextNormalizer(document2)
+# summarizer = TextSummarizer(tn(), TextSummarizer.Settings(Rank.GRASSHOPPER))
+# sn = summarizer(summary_length=5)
+# pprint(sn.sentences_score)
+# pprint(sn.summary_text)
 # pprint(Summarizer(tn()).summarizer(summary_length=5, rank_mode="D", rerank=True, query="game engine").summary_text)
 # pprint(summarizer(document1, summary_length=3, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
 # pprint(extract_keyphrase(document2))
