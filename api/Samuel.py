@@ -57,7 +57,7 @@ def api(data):
     def summarizer_settings():
         Rank = TextSummarizer.Settings.Rank
         Rerank = TextSummarizer.Settings.Rerank
-        _rank = Rank.DIVRANK
+        _rank = Rank.GRASSHOPPER
         _rerank = Rerank.GRASSHOPPER
 
         if rank == Rank.DIVRANK.value:

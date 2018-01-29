@@ -8,6 +8,10 @@ from typing import Callable, Tuple, Optional, Type, Dict, Union, Set, List, over
 from enum import Enum
 from TextNormalizer import TextNormalizer
 from textwrap import wrap, fill, indent
+
+import networkx as nx
+from networkx.exception import NetworkXError
+from networkx.utils import not_implemented_for
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 # TODO put additional properties
@@ -162,10 +166,10 @@ class TextSummarizer:
             for j in range(num_of_sentences):
                 reinforced_walk_sum = sum([organic_matrix[i][k] * n_visit[k] for k in range(num_of_sentences)])
                 reinforced_walk = (organic_matrix[i][j] * n_visit[j]) / reinforced_walk_sum
-                transition_matrix[i, j] = ((1 - lambda_value) * prior_distribution[j]) + (lambda_value * reinforced_walk)
+                transition_matrix[i, j] = ((1 - lambda_value) * prior_distribution[j]) + (
+                        lambda_value * reinforced_walk)
                 if cosine_matrix[i][j]:
                     n_visit[j] += 1
-
         initial_state = np.full(shape=num_of_sentences, fill_value=1 / num_of_sentences)
 
         def generate_divrank(old_state):
@@ -232,7 +236,6 @@ class TextSummarizer:
             fundamental_matrix = np.linalg.inv((identity_matrix - submatrix_q))
             all_one_vector = np.full(shape=num_of_sentences - num_of_ranked, fill_value=1)
             n_visit = np.dot(fundamental_matrix, all_one_vector) / (num_of_sentences - num_of_ranked)
-            print(n_visit)
             return n_visit.tolist()
 
         stationary_distribution = self.__power_method(prior_distribution,
@@ -587,7 +590,7 @@ Like other creatures, Dragons are generated randomly in the world and will engag
 """
 
 tn = TextNormalizer(document2)
-summarizer = TextSummarizer(tn(), TextSummarizer.Settings(Rank.GRASSHOPPER))
+summarizer = TextSummarizer(tn(), TextSummarizer.Settings(Rank.DIVRANK))
 sn = summarizer(summary_length=5)
 pprint(sn.sentences_score)
 pprint(sn.summary_text)
