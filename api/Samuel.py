@@ -6,8 +6,6 @@ from TextSentimentClassifier import unsupervised_extractor
 from warnings import filterwarnings
 from enum import Enum
 from typing import Type
-from pprint import pprint
-from WebParser import parse_html
 
 filterwarnings(action='ignore')
 
@@ -28,7 +26,7 @@ def api(data):
     def check_param(default, param: str):
         return default if param not in data else data[param]
 
-    text = data['corpus']
+    text = data['text']
 
     # TEXT TRANSLATOR
     translate_from = check_param(Language.TAGALOG.value, "translate_from")
