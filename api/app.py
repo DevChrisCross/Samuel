@@ -8,7 +8,7 @@ cors = CORS(app)
 
 @app.route('/')
 def get_tasks():
-    return "Welcome"
+    return "Welcome to SAMUEL API"
 
 
 @app.route('/samuel_api', methods=['POST'])

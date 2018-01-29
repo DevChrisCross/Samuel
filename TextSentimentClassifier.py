@@ -63,7 +63,7 @@ class SentimentIntensityAnalyzer:
 
             valence = 0
             if ((i < len(words_with_emoticons) - 1
-                 and words_with_emoticons[i].lower() == "kind" and words_with_emoticons[i+1].lower() == "of")
+                 and words_with_emoticons[i].lower() == "kind" and words_with_emoticons[i + 1].lower() == "of")
                     or item.lower() in BOOSTER_DICT):
                 word_valence.append(valence)
                 continue
@@ -103,7 +103,8 @@ class SentimentIntensityAnalyzer:
                         scalar = scalar * (0.95 if preceding_word_distance == 1 else 0.9)
 
                     valence += scalar
-                    valence = self._negation_word_check(valence, words_and_emoticons, preceding_word_distance, current_word_index)
+                    valence = self._negation_word_check(valence, words_and_emoticons, preceding_word_distance,
+                                                        current_word_index)
 
                     if preceding_word_distance == 2:
                         valence = self._idiom_word_check(valence, words_and_emoticons, current_word_index)
@@ -173,12 +174,12 @@ class SentimentIntensityAnalyzer:
                 valence = SPECIAL_CASE_IDIOMS[word_phrase]
                 break
 
-        if len(word_tokens)-1 > current_word_index:
+        if len(word_tokens) - 1 > current_word_index:
             phrase = f"{current_word} {word_tokens[current_word_index + 1]}"
             if phrase in SPECIAL_CASE_IDIOMS:
                 valence = SPECIAL_CASE_IDIOMS[phrase]
 
-        if len(word_tokens)-1 > current_word_index+1:
+        if len(word_tokens) - 1 > current_word_index + 1:
             phrase = f"{current_word} {word_tokens[current_word_index + 1]} {word_tokens[current_word_index + 2]}"
             if phrase in SPECIAL_CASE_IDIOMS:
                 valence = SPECIAL_CASE_IDIOMS[phrase]
@@ -260,10 +261,10 @@ class SentimentIntensityAnalyzer:
             neu = 0.0
 
         sentiment_dict = \
-            {"neg" : round(neg, 3),
-             "neu" : round(neu, 3),
-             "pos" : round(pos, 3),
-             "compound" : round(compound, 4)}
+            {"neg": round(neg, 3),
+             "neu": round(neu, 3),
+             "pos": round(pos, 3),
+             "compound": round(compound, 4)}
 
         return sentiment_dict
 
@@ -279,7 +280,7 @@ class SentimentIntensityAnalyzer:
         exclamation_point_count = text.count("!")
         if exclamation_point_count > 4:
             exclamation_point_count = 4
-        ep_amplifier = exclamation_point_count*0.292
+        ep_amplifier = exclamation_point_count * 0.292
         return ep_amplifier
 
     def _amplify_question_mark(self, text):
@@ -288,7 +289,7 @@ class SentimentIntensityAnalyzer:
         qm_amplifier = 0
         if question_mark_count > 1:
             if question_mark_count <= 3:
-                qm_amplifier = question_mark_count*0.18
+                qm_amplifier = question_mark_count * 0.18
             else:
                 qm_amplifier = 0.96
         return qm_amplifier
@@ -299,9 +300,9 @@ class SentimentIntensityAnalyzer:
         neu_count = 0
         for sentiment_score in word_valence:
             if sentiment_score > 0:
-                pos_sum += (float(sentiment_score) +1) # compensates for neutral words that are counted as 1
+                pos_sum += (float(sentiment_score) + 1)  # compensates for neutral words that are counted as 1
             if sentiment_score < 0:
-                neg_sum += (float(sentiment_score) -1) # when used with math.fabs(), compensates for neutrals
+                neg_sum += (float(sentiment_score) - 1)  # when used with math.fabs(), compensates for neutrals
             if sentiment_score == 0:
                 neu_count += 1
         return pos_sum, neg_sum, neu_count
@@ -321,23 +322,41 @@ def unsupervised_extractor(review: str, threshold: float = 0.1, verbose: bool = 
     scores = analyzer.polarity_scores(review)
     agg_score = scores['compound']
     final_sentiment = 'positive' if agg_score >= threshold else 'negative'
+    positive = ""
+    negative = ""
+    neutral = ""
+    compound = ""
+    final = ""
     if verbose:
-        positive = str(round(scores['pos'], 2)*100) + '%'
-        final = round(agg_score, 2)
-        negative = str(round(scores['neg'], 2)*100) + '%'
-        neutral = str(round(scores['neu'], 2)*100) + '%'
+        positive = str(round(scores['pos'], 2) * 100) + '%'
+        final = str(round(agg_score, 2) * 100) + '%'
+        negative = str(round(scores['neg'], 2) * 100) + '%'
+        neutral = str(round(scores['neu'], 2) * 100) + '%'
         compound = str(round(scores['compound'], 2) * 100) + '%'
         # print("Compound " + str(compound))
         # print("Positive " + str(positive))
         # print("Final " + str(final))
         # print("Negative " + str(negative))
         # print("Neutral " + str(neutral))
-    return final_sentiment
+    return {
+        'final_sentiment': final_sentiment,
+        'percentage': {
+            'positive': positive,
+            'negative': negative,
+            'neutral': neutral,
+            'compound': compound,
+            'final': final
+        }
+    }
 
-sample_data = [("I hope this group of highly film-makers!!!! never re-unites. ever again. IT SUCKS!!!! >:(", "negative"),
-              ("a mesmerizing film that certainly keeps your attention... Ben Daniels is fascinating (and courageous) to watch..", "positive"),
-              ("Worst horror film ever but funniest film ever rolled in one you have got to see this film it is so cheap it is unbeliaveble but you have to see it really!!!! P.s watch the carrot", "positive")]
-
+# sample_data = [
+#     ("I hope this group of highly film-makers!!!! never re-unites. ever again. IT SUCKS!!!! >:(", "negative"),
+#     ("a mesmerizing film that certainly keeps your attention... Ben Daniels is fascinating (and courageous) to watch..",
+#      "positive"),
+#     ("Worst horror film ever but funniest film ever rolled in one you have got to see this film it is so cheap it is "
+#      "unbeliaveble but you have to see it really!!!! P.s watch the carrot",
+#      "positive")]
+#
 # for review, review_sentiment in sample_data:
 #     print("Review")
 #     print(review)
@@ -345,5 +364,3 @@ sample_data = [("I hope this group of highly film-makers!!!! never re-unites. ev
 #     final_sentiment = unsupervised_extractor(review, threshold=0.1, verbose=True)
 #     print("Final Sentiment: " + final_sentiment)
 #     print("-" * 60)
-
-

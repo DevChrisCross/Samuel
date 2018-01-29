@@ -40,7 +40,7 @@ def api(data):
     # TEXT SENTIMENT CLASSIFIER
     threshold_classifier = check_param(0.1, "threshold_classifier")
     verbose = check_param(False, "verbose")
-    polarity = unsupervised_extractor(text, threshold_classifier, verbose)
+    sentiment_classifier = unsupervised_extractor(text, threshold_classifier, verbose)
 
     # TEXT TOPIC MODELLER
     visualize = check_param(False, "visualize")
@@ -74,7 +74,8 @@ def api(data):
 
     return {
         'summarized_text': summarize_text(summary_length, sort_by_score).summary_text,
-        'polarity': polarity,
+        'polarity': sentiment_classifier['final_sentiment'],
+        'percentage': sentiment_classifier['percentage'],
         'dashboard': dashboard
     }
 
