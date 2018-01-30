@@ -1,5 +1,5 @@
 from TextNormalizer import TextNormalizer
-from TextTranslator import translate, Language
+from TextTranslator import translate as text_translator, Language
 from TextSummarizer import TextSummarizer
 from TextTopicModeller import topic_modelling
 from TextSentimentClassifier import unsupervised_extractor
@@ -31,7 +31,8 @@ def api(data):
     # TEXT TRANSLATOR
     translate_from = check_param(Language.TAGALOG.value, "translate_from")
     translate_to = check_param(Language.ENGLISH.value, "translate_to")
-    text = translate(text, translate_from, translate_to)
+    translate = check_param(True, 'translate')
+    text = text_translator(text, translate, translate_from, translate_to)
 
     # TEXT NORMALIZER
     normalizer_settings = (TextNormalizer.Settings())

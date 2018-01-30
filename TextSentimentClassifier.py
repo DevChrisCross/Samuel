@@ -1,5 +1,6 @@
 import math
 import nltk.data
+import numpy as np
 from typing import Dict, List
 from TextNormalizer import SentiText
 
@@ -328,11 +329,18 @@ def unsupervised_extractor(review: str, threshold: float = 0.1, verbose: bool = 
     compound = ""
     final = ""
     if verbose:
-        positive = str(round(scores['pos'], 2) * 100) + '%'
+        positive = scores['pos'] * 100
+        negative = scores['neg'] * 100
+
         final = str(round(agg_score, 2) * 100) + '%'
-        negative = str(round(scores['neg'], 2) * 100) + '%'
         neutral = str(round(scores['neu'], 2) * 100) + '%'
         compound = str(round(scores['compound'], 2) * 100) + '%'
+
+        norm = np.linalg.norm([positive, negative], ord=1)
+        positive /= norm
+        negative /= norm
+        positive = str(round(positive, 2)*100) + '%'
+        negative = str(round(negative, 2)*100) + '%'
         # print("Compound " + str(compound))
         # print("Positive " + str(positive))
         # print("Final " + str(final))
@@ -343,20 +351,18 @@ def unsupervised_extractor(review: str, threshold: float = 0.1, verbose: bool = 
         'percentage': {
             'positive': positive,
             'negative': negative,
-            'neutral': neutral,
-            'compound': compound,
-            'final': final
+            'neutral': neutral
         }
     }
 
-# sample_data = [
-#     ("I hope this group of highly film-makers!!!! never re-unites. ever again. IT SUCKS!!!! >:(", "negative"),
-#     ("a mesmerizing film that certainly keeps your attention... Ben Daniels is fascinating (and courageous) to watch..",
-#      "positive"),
-#     ("Worst horror film ever but funniest film ever rolled in one you have got to see this film it is so cheap it is "
-#      "unbeliaveble but you have to see it really!!!! P.s watch the carrot",
-#      "positive")]
-#
+sample_data = [
+    ("I hope this group of highly film-makers!!!! never re-unites. ever again. IT SUCKS!!!! >:(", "negative"),
+    ("a mesmerizing film that certainly keeps your attention... Ben Daniels is fascinating (and courageous) to watch..",
+     "positive"),
+    ("Worst horror film ever but funniest film ever rolled in one you have got to see this film it is so cheap it is "
+     "unbeliaveble but you have to see it really!!!! P.s watch the carrot",
+     "positive")]
+
 # for review, review_sentiment in sample_data:
 #     print("Review")
 #     print(review)
