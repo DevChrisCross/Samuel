@@ -217,7 +217,7 @@ class TextSummarizer:
 
         if settings.reranking_mode:
             ranked_sentences = self._sentences_score
-            pprint(ranked_sentences)
+            # pprint(ranked_sentences)
             prior_distribution = [ranked_sentences[i][settings.ranking_mode["name"]] for i in range(num_of_sentences)]
             prior_distribution = np.divide(prior_distribution, sum(prior_distribution))
         else:
@@ -248,12 +248,12 @@ class TextSummarizer:
                                                       lambda state: np.dot(teleporting_random_walk, state),
                                                       settings.threshold)
 
-        pprint(cosine_matrix)
+        # pprint(cosine_matrix)
         g1 = stationary_distribution.index(max(stationary_distribution))
         num_of_ranked = 1
         visit_n = absorb_state(g1, num_of_ranked)
         for i in range(1, num_of_sentences):
-            print("Iteration: " + i)
+            # print("Iteration: " + i)
             num_of_ranked += 1
             sentence_index = visit_n.index(max(visit_n))
             sentence_index += num_of_ranked - 1
@@ -648,14 +648,14 @@ I do not really regret not getting an iPhone X, because in my opinion, first ite
 of that particular design and have constantly improved. I am sure for my usage, the specs are more than enough to get me through the next 2-3 years.
 """
 
-tn = TextNormalizer(document3)
-tn = tn()
-pprint(tn.normalized_text)
-tsSettings = TextSummarizer.Settings(Rank.GRASSHOPPER, Rerank.MAXIMAL_MARGINAL_RELEVANCE, "iphone")
-summarizer = TextSummarizer(tn, tsSettings)
-sn = summarizer(summary_length=5)
-# pprint(sn.sentences_score)
-pprint(sn.summary_text)
+# tn = TextNormalizer(document3)
+# tn = tn()
+# pprint(tn.normalized_text)
+# tsSettings = TextSummarizer.Settings(Rank.GRASSHOPPER, Rerank.MAXIMAL_MARGINAL_RELEVANCE, "iphone")
+# summarizer = TextSummarizer(tn, tsSettings)
+# sn = summarizer(summary_length=5)
+# # pprint(sn.sentences_score)
+# pprint(sn.summary_text)
 # pprint(Summarizer(tn()).summarizer(summary_length=5, rank_mode="D", rerank=True, query="game engine").summary_text)
 # pprint(summarizer(document1, summary_length=3, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
 # pprint(extract_keyphrase(document2))
