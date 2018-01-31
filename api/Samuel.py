@@ -1,6 +1,6 @@
 from TextNormalizer import TextNormalizer
 from TextTranslator import translate as text_translator, Language
-from TextSummarizer import TextSummarizer
+from TextSummarizer import TextSummarizer, Rank, Rerank
 from TextTopicModeller import topic_modelling
 from TextSentimentClassifier import unsupervised_extractor
 from warnings import filterwarnings
@@ -51,13 +51,11 @@ def api(data):
     summary_length = data['summary_length']
     sort_by_score = check_param(False, "sort_by_score")
     rank = check_param("D", "rank")
+    rerank = check_param(None, "rerank")
     query = check_param(None, "query")
 
     def summarizer_settings():
-        Rank = TextSummarizer.Settings.Rank
-        Rerank = TextSummarizer.Settings.Rerank
         _rank = Rank.GRASSHOPPER
-        _rerank = Rerank.GRASSHOPPER
 
         if rank == Rank.DIVRANK.value:
             _rank = Rank.DIVRANK
@@ -69,7 +67,7 @@ def api(data):
         if query is not None:
             return TextSummarizer.Settings(_rank, Rerank.MAXIMAL_MARGINAL_RELEVANCE, query)
         else:
-            return TextSummarizer.Settings(_rank, _rerank)
+            return TextSummarizer.Settings(_rank, rerank)
 
     summarize_text = TextSummarizer(normalized_text, summarizer_settings())
 
