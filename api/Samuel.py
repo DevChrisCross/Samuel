@@ -1,5 +1,5 @@
 from TextNormalizer import TextNormalizer
-from TextTranslator import translate, Language
+from TextTranslator import translate as text_translator, Language
 from TextSummarizer import TextSummarizer
 from TextTopicModeller import topic_modelling
 from TextSentimentClassifier import unsupervised_extractor
@@ -31,7 +31,8 @@ def api(data):
     # TEXT TRANSLATOR
     translate_from = check_param(Language.TAGALOG.value, "translate_from")
     translate_to = check_param(Language.ENGLISH.value, "translate_to")
-    text = translate(text, translate_from, translate_to)
+    translate = check_param(False, 'translate')
+    text = text_translator(text, translate, translate_from, translate_to)
 
     # TEXT NORMALIZER
     normalizer_settings = (TextNormalizer.Settings())
@@ -40,7 +41,7 @@ def api(data):
     # TEXT SENTIMENT CLASSIFIER
     threshold_classifier = check_param(0.1, "threshold_classifier")
     verbose = check_param(False, "verbose")
-    polarity = unsupervised_extractor(text, threshold_classifier, verbose)
+    sentiment_classifier = unsupervised_extractor(text, threshold_classifier, verbose)
 
     # TEXT TOPIC MODELLER
     visualize = check_param(False, "visualize")
@@ -74,7 +75,8 @@ def api(data):
 
     return {
         'summarized_text': summarize_text(summary_length, sort_by_score).summary_text,
-        'polarity': polarity,
+        'polarity': sentiment_classifier['final_sentiment'],
+        'percentage': sentiment_classifier['percentage'],
         'dashboard': dashboard
     }
 
