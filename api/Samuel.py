@@ -31,7 +31,7 @@ def api(data):
     # TEXT TRANSLATOR
     translate_from = check_param(Language.TAGALOG.value, "translate_from")
     translate_to = check_param(Language.ENGLISH.value, "translate_to")
-    translate = check_param(True, 'translate')
+    translate = check_param(False, 'translate')
     text = text_translator(text, translate, translate_from, translate_to)
 
     # TEXT NORMALIZER
