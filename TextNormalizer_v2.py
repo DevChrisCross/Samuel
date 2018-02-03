@@ -1,5 +1,8 @@
 import cProfile
 import pstats
+import re
+import enchant
+from nltk.corpus import wordnet
 from enum import Enum
 from typing import Dict, Type, List
 from pprint import pprint
@@ -7,8 +10,16 @@ from warnings import filterwarnings
 filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
+class Property(Enum):
+    Letter_Case = "preserve_lettercase"
+    Stop_Word = "preserve_stopword",
+    Spelling = "correct_spelling",
+    Pos_Filter = "pos_filter",
+    Special_Char = "preserve_special_char"
+
+
 class TextNormalizer:
-    def __init__(self, text: str, enable: List["Property"] = None, pos_filters: List[str] = None,
+    def __init__(self, text: str, enable: List[Property] = None, pos_filters: List[str] = None,
                  min_word_length: int = 1):
         if pos_filters is None:
             pos_filters = TextNormalizer.POS_FILTER
@@ -17,9 +28,8 @@ class TextNormalizer:
             if Property.Special_Char in enable:
                 pos_filters.extend(TextNormalizer.POS_UNIVERSAL["other"])
             if Property.Spelling in enable:
-                import re
-                import enchant
-                from nltk.corpus import wordnet
+                enchant_dict = enchant.Dict("en_US")
+                repeat_regex = re.compile(pattern=r"(\w*)(\w)\2(\w*)")
         else:
             enable = [Property.Pos_Filter]
 
@@ -29,10 +39,12 @@ class TextNormalizer:
         from nltk.corpus import stopwords
         stop_words = stopwords.words("english")
 
+        self._raw_sents = list()
         self._sentences = list()
         self._tokens = list()
 
         for sentence in document.sents:
+            self._raw_sents.append(sentence.text.strip())
             accepted_tokens = list()
             for token in sentence:
                 word = token.lemma_
@@ -52,13 +64,15 @@ class TextNormalizer:
                     continue
                 if token.is_punct and Property.Special_Char not in enable:
                     continue
-                if (token.is_stop or word in stop_words) and Property.Stopword not in enable:
+                if (token.is_stop or token.norm_ in stop_words) and Property.Stop_Word not in enable:
                     continue
                 else:
                     if Property.Pos_Filter in enable and token.pos_ not in pos_filters:
                         continue
-                    if Property.Spelling in enable:
-                        word = TextNormalizer.__correct_word(word, re, wordnet, enchant)
+                    if token.norm_ in stop_words:
+                        word = token.norm_
+                    if Property.Spelling in enable and token.pos_ not in TextNormalizer.POS_UNIVERSAL["other"]:
+                        word = TextNormalizer.__correct_word(word, enchant_dict, repeat_regex)
                 if Property.Letter_Case in enable:
                     if token.is_upper:
                         word = word.upper()
@@ -68,28 +82,25 @@ class TextNormalizer:
             self._tokens.extend(accepted_tokens)
             if accepted_tokens:
                 self._sentences.append(accepted_tokens)
+        print(self._raw_sents)
 
     @staticmethod
-    def __correct_word(word: str, re, wordnet, enchant) -> str:
+    def __correct_word(word: str, enchant_dict: enchant.Dict, regex: re) -> str:
         """
         Corrects the word by removing irregular repeated letters, then suggests possible words intended to be used
         using the PyEnchant library. You can check it at http://pythonhosted.org/pyenchant/api/enchant.html
         """
 
-        match_substitution = r'\1\2\3'
-        repeat_regex_string = r'(\w*)(\w)\2(\w*)'
-        repeat_regex_compiled = re.compile(pattern=repeat_regex_string)
-
         def __check_word(old_word: str) -> str:
             if wordnet.synsets(old_word):
                 return old_word
             else:
-                new_word = repeat_regex_compiled.sub(string=old_word, repl=match_substitution)
+                new_word = regex.sub(string=old_word, repl=r"\1\2\3")
                 new_word = new_word if new_word == old_word else __check_word(new_word)
                 return new_word
 
         initial_correct_word = __check_word(word)
-        enchant_dict = enchant.Dict("en_US")
+        print(initial_correct_word)
         is_word_correct = enchant_dict.check(initial_correct_word)
 
         if is_word_correct:
@@ -108,16 +119,8 @@ class TextNormalizer:
     }
 
 
-class Property(Enum):
-    Letter_Case = "preserve_lettercase"
-    Stopword = "preserve_stopword",
-    Spelling = "correct_spelling",
-    Pos_Filter = "pos_filter",
-    Special_Char = "preserve_special_char"
-
-
 document3 = """
-Hands down, of all the smartphones I have used so far, iPhone 8 Plus got the best battery life. I am not a heavy user. 
+My Hands are down, of all the smartphones I have used so far, iPhone 8 Plus got the best battery life. I am not a heavy user. 
 All I do is make few quick calls, check emails, quick update of social media and maps and navigation once in a while. 
 On average with light use (excluding maps and navigation), iPhone 8 Plus lasts for 4 full days! You heard it right, 
 4 full days! At the end of the 4th day, I am usually left with 5-10% of battery and that's about the time I charge the phone. 
@@ -164,7 +167,8 @@ I do not really regret not getting an iPhone X, because in my opinion, first ite
 of that particular design and have constantly improved. I am sure for my usage, the specs are more than enough to get me through the next 2-3 years.
 """
 
-cProfile.run("TextNormalizer(document3)", "summarizer")
+cProfile.run("TextNormalizer('My HHANNNDDDS are this big! It is so big.', "
+             "enable=[Property.Special_Char, Property.Letter_Case, Property.Stop_Word, Property.Spelling])", "summarizer")
 p = pstats.Stats("summarizer")
 p.strip_dirs().sort_stats("cumulative").print_stats(10)
 p.sort_stats('time').print_stats(10)
