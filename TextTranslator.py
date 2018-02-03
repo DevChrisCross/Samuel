@@ -12,7 +12,8 @@ class Language(Enum):
 
 
 def translate(corpus: str, enabled=False, translate_from=Language.TAGALOG.value, translate_to=Language.ENGLISH.value):
-    return corpus if not enabled else translator.translate(corpus, translate_to, translate_from)
+    return corpus if not enabled else translator.translate(corpus, translate_to, translate_from).text
+
 
 # movie_review = u"eto ung isa sa movie na hinding hindi ko makakalimutan, every scene ay talagang maganda. Siguradong numero uno to sa takilya"
 # hugot = u"Minsan may mga bagay talaga na mawawala at hindi mo ito mapipigilan. " \
@@ -26,4 +27,4 @@ def translate(corpus: str, enabled=False, translate_from=Language.TAGALOG.value,
 #                  u"May nakalaang pag-ibig para sayo." \
 #                  u"Kailangan mo lang matututong maghintay"
 #
-# print(translate(hugot))
+# print(translate(hugot, True))
