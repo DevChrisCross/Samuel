@@ -1,20 +1,17 @@
-import re
 import numpy as np
 import string
-import nltk
+import cProfile
+import pstats
 from pprint import pprint
 import warnings
 from typing import Callable, Tuple, Optional, Type, Dict, Union, Set, List, overload
 from enum import Enum
 from TextNormalizer import TextNormalizer
-from textwrap import wrap, fill, indent
+from textwrap import fill, indent
 
-import networkx as nx
-from networkx.exception import NetworkXError
-from networkx.utils import not_implemented_for
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
-# TODO put additional properties
+
 class TextSummarizer:
     Word = str
     WordCountRow = Dict[Word, int]
@@ -356,23 +353,38 @@ class TextSummarizer:
     @staticmethod
     def __build_cosine_matrix(tf: WordVector, idf: Dict[Word, float]) -> List[List[float]]:
 
+        # TODO PERFORM AN MATRIX OPERATION FOR OPTIMIZATION
         def idf_modified_cosine(x, y):
-            numerator = 0
-            summation_x = summation_y = 0
+            # numerator = 0
+            # summation_x = summation_y = 0
             dictionary = tf[x]
 
-            for word in dictionary:
-                numerator += tf[x][word] * tf[y][word] * np.square(idf[word])
-                summation_x += np.square(tf[x][word] * idf[word])
-                summation_y += np.square(tf[y][word] * idf[word])
+            numerator = np.sum([tf[x][word] * tf[y][word] * np.square(idf[word]) for word in dictionary])
+            summation_x = np.sum([np.square(tf[x][word] * idf[word]) for word in dictionary])
+            summation_y = np.sum([np.square(tf[y][word] * idf[word]) for word in dictionary])
+            # for word in dictionary:
+            #     numerator += tf[x][word] * tf[y][word] * np.square(idf[word])
+            #     summation_x += np.square(tf[x][word] * idf[word])
+            #     summation_y += np.square(tf[y][word] * idf[word])
 
             denominator = np.sqrt(summation_x) * np.sqrt(summation_y)
             idf_cosine = numerator / denominator
-            idf_cosine = float("{0:.3f}".format(idf_cosine))
+            idf_cosine = float("{0:.6f}".format(idf_cosine))
             return idf_cosine
 
         num_of_sentences = len(tf)
-        cosine_matrix = [[idf_modified_cosine(i, j) for j in range(num_of_sentences)] for i in range(num_of_sentences)]
+        cosine_matrix = [
+            [
+                float("{0:.6f}".format(
+                    np.sum([tf[i][word] * tf[j][word] * np.square(idf[word]) for word in tf[i]]) /
+                    (np.sqrt(np.sum([np.square(tf[i][word] * idf[word]) for word in tf[i]])) *
+                     np.sqrt(np.sum([np.square(tf[j][word] * idf[word]) for word in tf[i]])))
+                ))
+                # idf_modified_cosine(i, j)
+             for j in range(num_of_sentences)
+             ]
+            for i in range(num_of_sentences)
+        ]
         return cosine_matrix
 
     @staticmethod
@@ -648,30 +660,15 @@ I do not really regret not getting an iPhone X, because in my opinion, first ite
 of that particular design and have constantly improved. I am sure for my usage, the specs are more than enough to get me through the next 2-3 years.
 """
 
-tn = TextNormalizer(document3)
-tn = tn()
-pprint(tn.normalized_text)
-tsSettings = TextSummarizer.Settings(Rank.GRASSHOPPER, Rerank.MAXIMAL_MARGINAL_RELEVANCE, "iphone")
-summarizer = TextSummarizer(tn, tsSettings)
-sn = summarizer(summary_length=5)
-# pprint(sn.sentences_score)
-pprint(sn.summary_text)
-# pprint(Summarizer(tn()).summarizer(summary_length=5, rank_mode="D", rerank=True, query="game engine").summary_text)
-# pprint(summarizer(document1, summary_length=3, query="War against Iraq", tokenize_sent=False, sort_score=True, drank=True))
-# pprint(extract_keyphrase(document2))
-# print(numpy.add([5,2,3], [5,3,2]))
+# tn = TextNormalizer(document3)
+# tn = tn()
+# pprint(tn.normalized_text)
+# tsSettings = TextSummarizer.Settings(Rank.GRASSHOPPER, Rerank.MAXIMAL_MARGINAL_RELEVANCE, "iphone")
+# summarizer = TextSummarizer(tn, tsSettings)
+# cProfile.run("summarizer(summary_length=5)", "summarizer")
+# p = pstats.Stats("summarizer")
+# p.strip_dirs().sort_stats("cumulative").print_stats(10)
+# p.sort_stats('time').print_stats(10)
 
-from gensim.summarization import summarize
-# print(summarize("""The Elder Scrolls V: Skyrim is an open world action role-playing video game developed by Bethesda Game Studios and published by Bethesda Softworks.
-# It is the fifth installment in The Elder Scrolls series, following The Elder Scrolls IV: Oblivion.
-# Skyrim's main story revolves around the player character and their effort to defeat Alduin the World-Eater, a dragon who is prophesied to destroy the world.
-# The game is set two hundred years after the events of Oblivion and takes place in the fictional province of Skyrim.
-# The player completes quests and develops the character by improving skills.
-# Skyrim continues the open world tradition of its predecessors by allowing the player to travel anywhere in the game world at any time, and to ignore or postpone the main storyline indefinitely.
-# The player may freely roam over the land of Skyrim, which is an open world environment consisting of wilderness expanses, dungeons, cities, towns, fortresses and villages.
-# Players may navigate the game world more quickly by riding horses, or by utilizing a fast-travel system which allows them to warp to previously Players have the option to develop their character.
-# At the beginning of the game, players create their character by selecting one of several races, including humans, orcs, elves and anthropomorphic cat or lizard-like creatures, and then customizing their character's appearance, discovered locations.
-# Over the course of the game, players improve their character's skills, which are numerical representations of their ability in certain areas.
-# There are eighteen skills divided evenly among the three schools of combat, magic, and stealth.
-# Skyrim is the first entry in The Elder Scrolls to include Dragons in the game's wilderness.
-# Like other creatures, Dragons are generated randomly in the world and will engage in combat.""",ratio=0.4))
+
+
