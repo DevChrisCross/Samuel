@@ -1,12 +1,12 @@
+import re
 import cProfile
 import pstats
-import re
-import enchant
-from nltk.corpus import wordnet
-from enum import Enum
-from typing import Dict, Type, List
-from pprint import pprint
+from enchant import Dict
+from typing import List
 from warnings import filterwarnings
+from enum import Enum
+from nltk.corpus import stopwords, wordnet
+
 filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
@@ -14,64 +14,61 @@ class Property(Enum):
     Letter_Case = "preserve_lettercase"
     Stop_Word = "preserve_stopword",
     Spelling = "correct_spelling",
-    Pos_Filter = "pos_filter",
     Special_Char = "preserve_special_char"
 
 
 class TextNormalizer:
-    def __init__(self, text: str, enable: List[Property] = None, pos_filters: List[str] = None,
+    def __init__(self, text: str, enable: List[Property] = None,
+                 pos_filters: List[str] = None, punct_filters: List[str] = None,
                  min_word_length: int = 1):
         if pos_filters is None:
             pos_filters = TextNormalizer.POS_FILTER
         if enable:
-            enable.append(Property.Pos_Filter)
             if Property.Special_Char in enable:
-                pos_filters.extend(TextNormalizer.POS_UNIVERSAL["other"])
+                pos_filters.extend(["SYM", "X"])
+                if punct_filters is None:
+                    punct_filters = TextNormalizer.PUNCT_FILTER
             if Property.Spelling in enable:
-                enchant_dict = enchant.Dict("en_US")
+                enchant_dict = Dict("en_US")
                 repeat_regex = re.compile(pattern=r"(\w*)(\w)\2(\w*)")
-        else:
-            enable = [Property.Pos_Filter]
 
-        import spacy
-        document = spacy.load("en")(text)
-
-        from nltk.corpus import stopwords
+        from spacy import load
+        document = load("en")(text)
         stop_words = stopwords.words("english")
 
         self._raw_sents = list()
         self._sentences = list()
         self._tokens = list()
 
+        from spacy.tokens.token import Token
+
+        def is_essential(token: Token) -> bool:
+            return not (token.is_space or token.is_digit
+                        or token.is_left_punct or token.is_right_punct
+                        or token.is_quote or token.is_bracket
+                        or token.like_email or token.like_num or token.like_url)
+
+        def is_punct_needed(token: Token) -> bool:
+            return Property.Special_Char in enable and token.norm_ in punct_filters
+
+        def is_stopword_needed(token: Token) -> bool:
+            return Property.Stop_Word in enable and (token.is_stop or token.norm_ in stop_words)
+
+        def is_pos_filtered(token: Token) -> bool:
+            return token.pos_ in pos_filters
+
         for sentence in document.sents:
             self._raw_sents.append(sentence.text.strip())
             accepted_tokens = list()
             for token in sentence:
                 word = token.lemma_
-                if word == "":
+                if (not word or len(token) < min_word_length or not is_essential(token)
+                        or not (is_punct_needed(token) or is_stopword_needed(token) or is_pos_filtered(token))):
                     continue
-                if len(token) < min_word_length:
-                    continue
-                if (token.is_space
-                        or token.is_digit
-                        or token.is_left_punct
-                        or token.is_right_punct
-                        or token.is_quote
-                        or token.is_bracket
-                        or token.like_email
-                        or token.like_num
-                        or token.like_url):
-                    continue
-                if token.is_punct and Property.Special_Char not in enable:
-                    continue
-                if (token.is_stop or token.norm_ in stop_words) and Property.Stop_Word not in enable:
-                    continue
+                if token.is_stop or token.norm_ in stop_words:
+                    word = token.text
                 else:
-                    if Property.Pos_Filter in enable and token.pos_ not in pos_filters:
-                        continue
-                    if token.norm_ in stop_words:
-                        word = token.norm_
-                    if Property.Spelling in enable and token.pos_ not in TextNormalizer.POS_UNIVERSAL["other"]:
+                    if Property.Spelling in enable and len(word) > 4 and token.pos_ in ["ADJ", "ADV", "NOUN", "VERB"]:
                         word = TextNormalizer.__correct_word(word, enchant_dict, repeat_regex)
                 if Property.Letter_Case in enable:
                     if token.is_upper:
@@ -82,14 +79,16 @@ class TextNormalizer:
             self._tokens.extend(accepted_tokens)
             if accepted_tokens:
                 self._sentences.append(accepted_tokens)
-        print(self._raw_sents)
+        print(self._sentences)
 
     @staticmethod
-    def __correct_word(word: str, enchant_dict: enchant.Dict, regex: re) -> str:
+    def __correct_word(word: str, enchant_dict: Dict, regex: re) -> str:
         """
         Corrects the word by removing irregular repeated letters, then suggests possible words intended to be used
         using the PyEnchant library. You can check it at http://pythonhosted.org/pyenchant/api/enchant.html
         """
+        if enchant_dict.check(word):
+            return word
 
         def __check_word(old_word: str) -> str:
             if wordnet.synsets(old_word):
@@ -100,7 +99,6 @@ class TextNormalizer:
                 return new_word
 
         initial_correct_word = __check_word(word)
-        print(initial_correct_word)
         is_word_correct = enchant_dict.check(initial_correct_word)
 
         if is_word_correct:
@@ -109,6 +107,8 @@ class TextNormalizer:
             word_suggestions = enchant_dict.suggest(initial_correct_word)
             final_correct_word = word_suggestions[0] if word_suggestions else initial_correct_word
             return final_correct_word
+
+    PUNCT_FILTER = ["?", "!"]
 
     POS_FILTER = ["ADJ", "ADV", "NOUN", "PROPN", "VERB"]
 
@@ -167,7 +167,7 @@ I do not really regret not getting an iPhone X, because in my opinion, first ite
 of that particular design and have constantly improved. I am sure for my usage, the specs are more than enough to get me through the next 2-3 years.
 """
 
-cProfile.run("TextNormalizer('My HHANNNDDDS are this big! It is so big.', "
+cProfile.run("TextNormalizer(document3, "
              "enable=[Property.Special_Char, Property.Letter_Case, Property.Stop_Word, Property.Spelling])", "summarizer")
 p = pstats.Stats("summarizer")
 p.strip_dirs().sort_stats("cumulative").print_stats(10)

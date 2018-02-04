@@ -1,0 +1,2 @@
+class TextSummarizer:
+    pass
