@@ -195,6 +195,25 @@ class NormalizerManager:
         pool.join()
         print("Normalization pooling done: object", (id(self)))
 
+    @property
+    def raw_sents(self):
+        return self._raw_sents
+
+    @property
+    def sentences(self):
+        return self._sentences
+
+    @property
+    def tokens(self):
+        return self._tokens
+
+    def __str__(self):
+        return "\n".join([
+            "Normalized Sentences",
+            indent("\n".join([str(array) for array in self._sentences]), "\t"),
+            "Tokens",
+            indent(str(self._tokens), "\t")
+        ])
 
 documents = ["""
 My Hands are down, of all the smartphones I have used so far, iPhone 8 Plus got the best battery life. I am not a heavy user. 
