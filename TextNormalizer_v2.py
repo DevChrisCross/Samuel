@@ -58,7 +58,7 @@ class TextNormalizer:
                     or token.is_quote or token.is_bracket
                     or token.like_email or token.like_num or token.like_url)
 
-        def filtered_tokens(sentence):
+        def filtered_tokens(sentence: tokens.Span) -> str:
             for token in sentence:
                 base_word = token.lemma_
                 if (not base_word
@@ -168,7 +168,7 @@ class NormalizerManager:
             batch_count = batch_count if batch_count else cpu_count()
             divider = len(sentences) // batch_count
 
-            def partitioned_docs(document):
+            def partitioned_docs() -> str:
                 start_divider = 0
                 for i in range(batch_count):
                     start_divider = start_divider
@@ -178,7 +178,7 @@ class NormalizerManager:
                     yield " ".join([sentence.text for sentence in sentences[start_divider:end_divider]])
                     start_divider += divider
 
-            documents = [document for document in partitioned_docs(documents)]
+            documents = [document for document in partitioned_docs()]
 
         print("Preparing process pool: object", (id(self)))
         pool = mp.Pool()
