@@ -58,10 +58,7 @@ class TextNormalizer:
                     or token.is_quote or token.is_bracket
                     or token.like_email or token.like_num or token.like_url)
 
-        print("Filtering tokens and sentences: object", id(self))
-        for sentence in document.sents:
-            self._raw_sents.append(sentence.text.strip())
-            accepted_tokens = list()
+        def filtered_tokens(sentence):
             for token in sentence:
                 base_word = token.lemma_
                 if (not base_word
@@ -87,9 +84,14 @@ class TextNormalizer:
                         base_word = base_word.capitalize()
                 else:
                     base_word = base_word.lower()
-                accepted_tokens.append(base_word)
-            self._tokens.extend(accepted_tokens)
+                yield base_word
+
+        print("Filtering tokens and sentences: object", id(self))
+        for sentence in document.sents:
+            self._raw_sents.append(sentence.text.strip())
+            accepted_tokens = [token for token in filtered_tokens(sentence)]
             if accepted_tokens:
+                self._tokens.extend(accepted_tokens)
                 self._sentences.append(accepted_tokens)
         print("Text normalization done: object", id(self))
 
@@ -166,16 +168,17 @@ class NormalizerManager:
             batch_count = batch_count if batch_count else cpu_count()
             divider = len(sentences) // batch_count
 
-            doc_partition = list()
-            start_divider = 0
-            for i in range(batch_count):
-                start_divider = start_divider
-                end_divider = start_divider + divider
-                if i == 3:
-                    end_divider += len(sentences) % batch_count
-                doc_partition.append(" ".join([sentence.text for sentence in sentences[start_divider:end_divider]]))
-                start_divider += divider
-            documents = doc_partition
+            def partitioned_docs(document):
+                start_divider = 0
+                for i in range(batch_count):
+                    start_divider = start_divider
+                    end_divider = start_divider + divider
+                    if i == 3:
+                        end_divider += len(sentences) % batch_count
+                    yield " ".join([sentence.text for sentence in sentences[start_divider:end_divider]])
+                    start_divider += divider
+
+            documents = [document for document in partitioned_docs(documents)]
 
         print("Preparing process pool: object", (id(self)))
         pool = mp.Pool()
@@ -266,15 +269,17 @@ of that particular design and have constantly improved. I am sure for my usage, 
 document = " ".join(documents)
 
 if __name__ == "__main__":
-    cProfile.run("TextNormalizer(document, enable={Property.Spelling})", "Text_Normalizer")
-    tn_profiler = pstats.Stats("Text_Normalizer")
-    tn_profiler.strip_dirs().sort_stats("cumulative").print_stats(10)
-    tn_profiler.sort_stats('time').print_stats(10)
+    # print(TextNormalizer(document, enable={Property.Spelling}))
+    # cProfile.run("TextNormalizer(document, enable={Property.Spelling})", "Text_Normalizer")
+    # tn_profiler = pstats.Stats("Text_Normalizer")
+    # tn_profiler.strip_dirs().sort_stats("cumulative").print_stats(10)
+    # tn_profiler.sort_stats('time').print_stats(10)
 
-    cProfile.run("NormalizerManager(document, enable={Property.Spelling}, batch_count=16)", "Text_Normalizer_MP")
-    tn_mp_profiler = pstats.Stats("Text_Normalizer_MP")
-    tn_mp_profiler.strip_dirs().sort_stats("cumulative").print_stats(10)
-    tn_mp_profiler.sort_stats('time').print_stats(10)
+    NormalizerManager(document, batch_count=16)
+    # cProfile.run("NormalizerManager(document, enable={Property.Spelling}, batch_count=16)", "Text_Normalizer_MP")
+    # tn_mp_profiler = pstats.Stats("Text_Normalizer_MP")
+    # tn_mp_profiler.strip_dirs().sort_stats("cumulative").print_stats(10)
+    # tn_mp_profiler.sort_stats('time').print_stats(10)
 
 
 
