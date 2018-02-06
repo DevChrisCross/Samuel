@@ -1,51 +1,8 @@
 import math
-import nltk.data
 import numpy as np
 from typing import Dict, List
 from TextNormalizer import SentiText
-
-BOOSTER_INCREMENT = 0.293
-BOOSTER_DECREMENT = -0.293
-CAPITAL_INCREMENT = 0.733
-NEGATION_SCALAR = -0.74
-
-NEGATE = ["aint", "arent", "cannot", "cant", "couldnt", "darent", "didnt", "doesnt", "ain't", "aren't", "can't",
-          "couldn't", "daren't", "didn't", "doesn't", "dont", "hadnt", "hasnt", "havent", "isnt", "mightnt", "mustnt",
-          "neither", "don't", "hadn't", "hasn't", "haven't", "isn't", "mightn't", "mustn't", "neednt", "needn't",
-          "never", "none", "nope", "nor", "not", "nothing", "nowhere", "oughtnt", "shant", "shouldnt", "uhuh", "wasnt",
-          "werent", "oughtn't", "shan't", "shouldn't", "uh-uh", "wasn't", "weren't", "without", "wont", "wouldnt",
-          "won't", "wouldn't", "rarely", "seldom", "despite"]
-
-POSITIVE_WORD_BOOSTERS = ["absolutely", "amazingly", "awfully", "completely", "considerably", "decidedly", "deeply",
-                          "effing", "enormously", "entirely", "especially", "exceptionally", "extremely", "fabulously",
-                          "flipping", "flippin", "fricking", "frickin", "frigging", "friggin", "fully", "fucking",
-                          "greatly", "hella", "highly", "hugely", "incredibly", "intensely", "majorly", "more", "most",
-                          "particularly", "purely", "quite", "really", "remarkably", "so", "substantially",
-                          "thoroughly", "totally", "tremendously", "uber", "unbelievably", "unusually", "utterly",
-                          "very"]
-
-NEGATIVE_WORD_BOOSTERS = ["almost", "barely", "hardly", "just enough", "kind of", "kinda", "kindof", "kind-of", "less",
-                          "little", "marginally", "occasionally", "partly", "scarcely", "slightly", "somewhat",
-                          "sort of", "sorta", "sortof", "sort-of"]
-
-BOOSTER_DICT = dict.fromkeys(POSITIVE_WORD_BOOSTERS, BOOSTER_INCREMENT)
-BOOSTER_DICT.update(dict.fromkeys(NEGATIVE_WORD_BOOSTERS, BOOSTER_DECREMENT))
-
-SPECIAL_CASE_IDIOMS = {"the shit": 3, "the bomb": 3, "bad ass": 1.5, "yeah right": -2, "cut the mustard": 2,
-                       "kiss of death": -1.5, "hand to mouth": -2}
-
-
-class Lexicon:
-    def __init__(self, lexicon_filepath: str = "sentiment/vader_lexicon.zip/vader_lexicon/vader_lexicon.txt"):
-        lexicon_textfile = nltk.data.load(lexicon_filepath)
-        lexicon_dict = dict()
-        for line in lexicon_textfile.split('\n'):
-            word, measure = line.strip().split('\t')[0:2]
-            lexicon_dict[word] = float(measure)
-        self._lexicon = lexicon_dict
-
-    def lexicon_dict(self):
-        return self._lexicon
+from constants.vader import *
 
 
 class SentimentIntensityAnalyzer:
@@ -318,8 +275,7 @@ def unsupervised_extractor(review: str, threshold: float = 0.1, verbose: bool = 
     :return:
     """
 
-    lexicon = Lexicon().lexicon_dict()
-    analyzer = SentimentIntensityAnalyzer(lexicon)
+    analyzer = SentimentIntensityAnalyzer(VADER)
     scores = analyzer.polarity_scores(review)
     agg_score = scores['compound']
     final_sentiment = 'positive' if agg_score >= threshold else 'negative'
@@ -355,7 +311,10 @@ def unsupervised_extractor(review: str, threshold: float = 0.1, verbose: bool = 
         }
     }
 
-sample_data = [
+
+if __name__ == "__main__":
+
+    sample_data = [
     ("I hope this group of highly film-makers!!!! never re-unites. ever again. IT SUCKS!!!! >:(", "negative"),
     ("a mesmerizing film that certainly keeps your attention... Ben Daniels is fascinating (and courageous) to watch..",
      "positive"),
