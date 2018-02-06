@@ -8,7 +8,7 @@ from nltk.corpus import wordnet
 from itertools import product
 from typing import Dict, Type
 from textwrap import indent
-from constants.taggers import *
+from samuel.constants.taggers import *
 
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 

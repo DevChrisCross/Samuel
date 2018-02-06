@@ -1,12 +1,8 @@
 import numpy as np
-import string
-import cProfile
-import pstats
-from pprint import pprint
 import warnings
-from typing import Callable, Tuple, Optional, Type, Dict, Union, Set, List, overload
+from typing import Callable, Tuple, Optional, Dict, Union, Set, List
 from enum import Enum
-from TextNormalizer import TextNormalizer
+from samuel.TextNormalizer import TextNormalizer
 from textwrap import fill, indent
 
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')

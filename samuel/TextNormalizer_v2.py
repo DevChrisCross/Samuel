@@ -1,6 +1,4 @@
 import re
-import cProfile
-import pstats
 import multiprocessing as mp
 from string import punctuation
 from textwrap import indent
@@ -12,7 +10,7 @@ from os import cpu_count
 from functools import partial
 from nltk.corpus import stopwords, wordnet
 from spacy import load, tokens
-from constants.taggers import *
+from samuel.constants.taggers import *
 filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 

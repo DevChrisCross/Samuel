@@ -1,5 +1,5 @@
 import numpy as np
-from TextNormalizer_v2 import TextNormalizer
+from samuel.TextNormalizer_v2 import TextNormalizer
 from typing import List, Dict, Tuple
 
 

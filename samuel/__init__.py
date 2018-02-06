@@ -37,7 +37,7 @@ __keywords__ = ['NLP', 'CL', 'natural language processing', 'sentiment analysis'
 
 __url__ = ""
 
-__maintainer__ = "Dennis De Leon, Christian Noel Molinam, Patrick Dale Rugayan, Eric Sumalinog"
+__maintainer__ = "Dennis De Leon, Christian Noel Molina, Patrick Dale Rugayan, Eric Sumalinog"
 __maintainer_email__ = ""
 __author__ = __maintainer__
 __author_email__ = __maintainer_email__

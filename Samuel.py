@@ -1,8 +1,8 @@
-from TextNormalizer import TextNormalizer
-from TextTranslator import translate as text_translator, Language
-from TextSummarizer import TextSummarizer, Rank, Rerank
-from TextTopicModeller import topic_modelling
-from TextSentimentClassifier import unsupervised_extractor
+from samuel.TextNormalizer import TextNormalizer
+from samuel.TextTranslator import translate as text_translator, Language
+from samuel.TextSummarizer import TextSummarizer, Rank, Rerank
+from samuel.TextTopicModeller import topic_modelling
+from samuel.TextSentimentClassifier import unsupervised_extractor
 from warnings import filterwarnings
 from enum import Enum
 from typing import Type
