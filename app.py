@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, abort, request
 from flask_cors import CORS
-from api import Samuel
+import Samuel
 
 app = Flask(__name__)
 cors = CORS(app)
