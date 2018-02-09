@@ -1,7 +1,7 @@
 import math
 import numpy as np
 from typing import Dict, List
-from samuel.TextNormalizer import SentiText
+from samuel.old_normalizer import SentiText
 
 
 class SentimentIntensityAnalyzer:

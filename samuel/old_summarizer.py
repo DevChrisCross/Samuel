@@ -1,8 +1,10 @@
+import cProfile, pstats
+from pprint import pprint
 import numpy as np
 import warnings
 from typing import Callable, Tuple, Optional, Dict, Union, Set, List
 from enum import Enum
-from samuel.TextNormalizer import TextNormalizer
+from samuel.old_normalizer import TextNormalizer
 from textwrap import fill, indent
 
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
@@ -365,13 +367,14 @@ class TextSummarizer:
 
             denominator = np.sqrt(summation_x) * np.sqrt(summation_y)
             idf_cosine = numerator / denominator
-            idf_cosine = float("{0:.6f}".format(idf_cosine))
+            idf_cosine = float("{0:.2f}".format(idf_cosine))
+            # print(idf_cosine)
             return idf_cosine
 
         num_of_sentences = len(tf)
         cosine_matrix = [
             [
-                float("{0:.6f}".format(
+                float("{0:.2f}".format(
                     np.sum([tf[i][word] * tf[j][word] * np.square(idf[word]) for word in tf[i]]) /
                     (np.sqrt(np.sum([np.square(tf[i][word] * idf[word]) for word in tf[i]])) *
                      np.sqrt(np.sum([np.square(tf[j][word] * idf[word]) for word in tf[i]])))
@@ -381,6 +384,8 @@ class TextSummarizer:
              ]
             for i in range(num_of_sentences)
         ]
+        for _ in cosine_matrix:
+            print(_)
         return cosine_matrix
 
     @staticmethod
@@ -656,13 +661,14 @@ I do not really regret not getting an iPhone X, because in my opinion, first ite
 of that particular design and have constantly improved. I am sure for my usage, the specs are more than enough to get me through the next 2-3 years.
 """
 
-# tn = TextNormalizer(document3)
-# tn = tn()
-# pprint(tn.normalized_text)
-# tsSettings = TextSummarizer.Settings(Rank.GRASSHOPPER, Rerank.MAXIMAL_MARGINAL_RELEVANCE, "iphone")
-# summarizer = TextSummarizer(tn, tsSettings)
+if __name__ == "__main__":
+    tn = TextNormalizer(document1)
+    tn = tn()
+    # pprint(tn.normalized_text)
+    tsSettings = TextSummarizer.Settings(Rank.GRASSHOPPER, Rerank.MAXIMAL_MARGINAL_RELEVANCE, "iphone")
+    summarizer = TextSummarizer(tn, tsSettings)
 
-# cProfile.run("summarizer(summary_length=5)", "summarizer")
-# p = pstats.Stats("summarizer")
-# p.strip_dirs().sort_stats("cumulative").print_stats(10)
-# p.sort_stats('time').print_stats(10)
+    # cProfile.run("summarizer(summary_length=5)", "summarizer")
+    # p = pstats.Stats("summarizer")
+    # p.strip_dirs().sort_stats("cumulative").print_stats(10)
+    # p.sort_stats('time').print_stats(10)

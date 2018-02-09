@@ -9,12 +9,12 @@ from itertools import product
 from typing import Dict, Type
 from textwrap import indent
 from samuel.constants.taggers import *
-
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
 class TextNormalizer:
     def __init__(self, text: str, settings: "TextNormalizer.Settings" = None):
+        warnings.warn('Use TextNormalizer from samuel.normalizer instead.', DeprecationWarning)
         self._text = text
         self._normalized = self._tokens = self._raw = None
         self._settings = settings if settings else TextNormalizer.Settings()
@@ -42,8 +42,8 @@ class TextNormalizer:
 
         pos_tagged_sentences = nltk.pos_tag_sents(tokenized_sentences, tagset="universal")
 
-        def __is_special_character(word: str):
-            return TextNormalizer.SPECIAL_CHARACTER_REGEX.sub(string=word, repl="") == ""
+        def __is_special_character(w: str):
+            return TextNormalizer.SPECIAL_CHARACTER_REGEX.sub(string=w, repl="") == ""
 
         normalized_sentences = list()
         for sentence in pos_tagged_sentences:
@@ -253,9 +253,9 @@ class TextNormalizer:
         def __str__(self):
             all_properties = list(filter(lambda p: p.startswith("_") and not p.startswith("__"), dir(self)))
 
-            def __filter_property_type(type: Type) -> dict:
-                return {property[1:].replace("_", " "): getattr(self, property) for property in all_properties
-                        if isinstance(getattr(self, property), type)}
+            def __filter_property_type(t: Type) -> dict:
+                return {p[1:].replace("_", " "): getattr(self, p) for p in all_properties
+                        if isinstance(getattr(self, p), t)}
 
             numeric_properties = {key: value for key, value in __filter_property_type(int).items()
                                   if not isinstance(value, bool)}
@@ -315,7 +315,8 @@ class TextNormalizer:
 
         def set_special_character_properties(
                 self, preserve_special_character: bool = True, preserve_punctuation_emphasis: bool = True,
-                punctuation_emphasis_level: int = 1, punctuation_emphasis_list: str = None) -> "TextNormalizer.Settings":
+                punctuation_emphasis_level: int = 1,
+                punctuation_emphasis_list: str = None) -> "TextNormalizer.Settings":
 
             self._preserve_special_character = preserve_special_character
             if preserve_punctuation_emphasis:
@@ -449,7 +450,8 @@ class SentiText:
                 wes[i] = words_punc_dict[we]
         return wes
 
-    def _words_plus_punc(self, text: str):
+    @staticmethod
+    def _words_plus_punc(text: str):
         """
         Returns mapping of form:
         {
@@ -474,20 +476,6 @@ class SentiText:
         clean_text = punctuation_regex_compiled.sub(repl='', string=text)
         return clean_text.split()
 
-    PUNCTUATIONS = [".", "!", "?", ",", ";", ":", "-", "'", "\"", "!!", "!!!", "??", "???", "?!?", "!?!", "?!?!", "!?!?"]
-
-# deprecated version
-# print(TextNormalizer.create_normalizer("Some string FADAD :)").normalize_text(
-#     request_tokens=True, preserve_special_character=True, preserve_punctuation_emphasis=True,
-#     punctuation_emphasis_list="?!", punctuation_emphasis_level=2, preserve_stopword=True,
-#     minimum_word_length=2, enable_pos_tag_filter=True, preserve_lettercase=True, correct_spelling=True))
-
-
-# settings = (TextNormalizer.Settings()
-#             .set_independent_properties(minimum_word_length=2, request_tokens=True, preserve_lettercase=True)
-#             .set_special_character_properties(punctuation_emphasis_level=4)
-#             .set_word_contraction_properties()
-#             .set_pos_tag_properties(enable_pos_tag_filter=False))
-# textNormalizer = TextNormalizer("I hope this group of film-makers!!!! never re-unites. ever again. IT SUCKS????  >:(",
-#                                 settings)
-# print(textNormalizer().append("Here you go! :)"))
+    PUNCTUATIONS = [
+        ".", "!", "?", ",", ";", ":", "-", "'", "\"", "!!", "!!!", "??", "???", "?!?", "!?!", "?!?!", "!?!?"
+    ]

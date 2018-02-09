@@ -7,7 +7,7 @@ setup(name='samuel',
           Sentiment Analyzing Machine that can Understand Enumerated Languages (SAMUEL)
           is a NLP library and api directed towards analyzing documents and its sentiments,
           topics, and summary. SAMUEL requires Python 3.0 or higher""",
-      url='http://github.com/storborg/funniest',
+      url='',
       author='Dennis De Leon, Christian Noel Molina, Patrick Dale Rugayan, Eric Sumalinog',
       author_email='',
       classifiers=[
@@ -33,7 +33,7 @@ setup(name='samuel',
       keywords=[
           'NLP', 'CL', 'natural language processing', 'sentiment analysis',
           'computational linguistics', 'parsing', 'tagging', 'summarization',
-          'tokenizing', 'syntax', 'linguistics', 'language', 'normalization'
+          'tokenizing', 'syntax', 'linguistics', 'language', 'normalization',
           'natural language', 'text analytics', 'topic modelling', 'api'
       ],
       license='MIT',
