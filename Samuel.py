@@ -2,7 +2,7 @@ from samuel.old_normalizer import TextNormalizer
 from samuel.TextTranslator import translate as text_translator, Language
 from samuel.old_summarizer import TextSummarizer, Rank, Rerank
 from samuel.TextTopicModeller import topic_modelling
-from samuel.TextSentimentClassifier import unsupervised_extractor
+from samuel.sentiment_classifier import unsupervised_extractor
 from warnings import filterwarnings
 from enum import Enum
 from typing import Type

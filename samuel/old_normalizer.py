@@ -414,7 +414,8 @@ class SentiText:
         if not isinstance(text, str):
             text = str(text.encode('utf-8'))
         self.text = text
-        self.words_and_emoticons = self._words_and_emoticons()
+        from samuel import normalizer
+        self.words_and_emoticons = normalizer.TextNormalizer(text).tokens
         # doesn't separate words from adjacent punctuation (keeps emoticons & contractions)
         self.is_cap_diff = SentiText.allcap_differential(self.words_and_emoticons)
 
