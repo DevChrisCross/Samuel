@@ -1,19 +1,26 @@
-from flask import Flask, jsonify, abort, request
+from flask import Flask, jsonify, request
 from flask_cors import CORS
-from api import Samuel
+import requests
+import Samuel
 
 app = Flask(__name__)
 cors = CORS(app)
 
+
+def valid(api_key):
+    return requests.get("http://samuelapi/validate_key?key="+api_key).json()
 
 @app.route('/')
 def get_tasks():
     return "Welcome to SAMUEL API"
 
 
-@app.route('/samuel_api', methods=['POST'])
+@app.route('/samuel_api', methods=['POST', 'GET'])
 def samuel_api():
-    return jsonify(Samuel.api(request.get_json()))
+    if valid(request.args.get('KEY')):
+        return jsonify(Samuel.api(request.get_json()))
+    else:
+        return "Invalid API Key"
 
 
 @app.route('/samuel_init', methods=['GET'])
