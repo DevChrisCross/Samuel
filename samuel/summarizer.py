@@ -31,6 +31,7 @@ class TextSummarizer:
                     vector[dictionary[word]] += 1
                 yield vector
 
+        print("Constructing cosine similarity matrix: @TextNormalizer", )
         word_dictionary = {word: i for word, i in word_dict()}
         term_freq = np.array([vector for vector in word_vec(word_dictionary)], dtype=np.float64)
         inv_doc_freq = np.full((len(word_dictionary),), np.log(float(len(term_freq))), dtype=np.float64)
@@ -45,6 +46,7 @@ class TextSummarizer:
                              / (np.linalg.norm(tf_idf[i]) * np.linalg.norm(tf_idf[j])))
                     vector[j] = value
                 yield vector
+
 
         return np.array(list(cos_matrix()), dtype=np.float64)
 
@@ -83,6 +85,7 @@ class TextSummarizer:
         return states[time_t]
 
     def __score_aggregator(self, scores: np.ndarray) -> Tuple[str, List[Dict[str, Union[float, str]]]]:
+        print("Aggregating scores and summary: object", id(self))
         score_sents = [{"index": i, "score": scores[i-1], "sentence": sentence}
                        for i, sentence in enumerate(self._sentences)]
         score_sents.sort(key=lambda sentence: sentence["score"], reverse=True)
@@ -90,6 +93,7 @@ class TextSummarizer:
         if not self._sort_by_score:
             summary.sort(key=lambda sentence: sentence["index"], reverse=True)
         summary_text = " ".join([sentence["sentence"] for sentence in summary])
+        print("Summarization done: object", id(self))
         return summary_text, score_sents
 
     def continuous_lexrank(self, damping_factor: float = 0.85):
@@ -105,6 +109,7 @@ class TextSummarizer:
                 yield state
 
         transition_matrix = np.array(list(self.__apply_right_stochastic(self._cosine_matrix)), dtype=np.float64)
+        print("Computing stationary distribution: object", id(self))
         scores = TextSummarizer.__power_method(transition_matrix, state_func)
         return self.__score_aggregator(scores)
 
@@ -114,15 +119,20 @@ class TextSummarizer:
         _alpha = alpha
         _beta = beta
 
+        print("Establishing transition matrix: object", id(self))
         transition_matrix = self._cosine_matrix
         transition_matrix = np.array(list(self.__apply_cos_threshold(transition_matrix)), dtype=np.float64)
         transition_matrix = np.array(list(self.__apply_right_stochastic(transition_matrix)), dtype=np.float64)
         organic_matrix = np.array(list([(1 - _alpha) if i == j else (_alpha * transition_matrix[i, j])
                                         for j in range(_length)] for i in range(_length)), dtype=np.float64)
 
+        print("Establishing prior distribution: object", id(self))
         if not prior_distribution:
-            prior_distribution = np.array([np.power(i + 1, _beta * -1) if _beta else (1 / _length)
-                                  for i in range(_length)], dtype=np.float64)
+            if _beta:
+                prior_distribution = np.array([np.power(i + 1, _beta * -1) for i in range(_length)], dtype=np.float64)
+            else:
+                prior_distribution = np.full((_length,), 1 / _length, dtype=np.float64)
+
         n_visit = np.full((_length,), 1)
         def state_func(t_matrix: np.ndarray, prev_state: np.ndarray) -> np.ndarray:
             for u in range(_length):
@@ -140,6 +150,7 @@ class TextSummarizer:
                 state += ((1 - _lambda) * prior_distribution[u])
                 yield state
 
+        print("Computing stationary distribution: object", id(self))
         scores = TextSummarizer.__power_method(transition_matrix, state_func)
         return self.__score_aggregator(scores)
 
@@ -147,14 +158,18 @@ class TextSummarizer:
         _length = len(self._norm_sents)
         _alpha = alpha
 
+        print("Establishing transition matrix: object", id(self))
         transition_matrix = self._cosine_matrix
         transition_matrix = np.array(list(self.__apply_cos_threshold(transition_matrix)), dtype=np.float64)
         transition_matrix = np.array(list(self.__apply_right_stochastic(transition_matrix)), dtype=np.float64)
         transition_matrix = np.multiply(_lambda, transition_matrix)
 
+        print("Establishing a teleporting random walk: object", id(self))
         if not prior_distribution:
-            prior_distribution = np.array([np.power(i + 1, _alpha * -1) if _alpha else (1 / _length)
-                                  for i in range(_length)], dtype=np.float64)
+            if alpha:
+                prior_distribution = np.array([np.power(i + 1, _alpha * -1) for i in range(_length)], dtype=np.float64)
+            else:
+                prior_distribution = np.full((_length,), 1/_length, dtype=np.float64)
         all_one_vector = np.full(_length, 1, dtype=np.float64)
         prior_distribution = np.outer(all_one_vector, prior_distribution)
         prior_distribution = np.multiply((1 - _lambda), prior_distribution)
@@ -165,6 +180,7 @@ class TextSummarizer:
         def state_func(t_matrix: np.ndarray, prev_state: np.ndarray) -> np.ndarray:
             return np.dot(t_matrix.transpose(), prev_state)
 
+        print("Computing stationary distribution: object", id(self))
         stationary_distribution = TextSummarizer.__power_method(teleporting_random_walk, state_func).tolist()
         grank_one = stationary_distribution.index(max(stationary_distribution))
         num_of_ranked = 1
@@ -173,18 +189,21 @@ class TextSummarizer:
             sentence_index = markov_chain_tracker.pop(index)
             markov_chain_tracker.insert(0, sentence_index)
 
-            teleporting_random_walk[index] = [1 if index == i else 0 for i in range(_length)]
+            absorbing_state = np.full((_length,), 0, dtype=np.float64)
+            absorbing_state[index] = 1
+            teleporting_random_walk[index] = absorbing_state
             sentence_vector = teleporting_random_walk.pop(index)
             teleporting_random_walk.insert(0, sentence_vector)
 
-            submatrix_q = [[teleporting_random_walk[i][j] for j in range(num_of_ranked, _length)]
-                           for i in range(num_of_ranked, _length)]
-            identity_matrix = np.diag([1 for _ in range(num_of_ranked, _length)])
+            submatrix_q = np.array(teleporting_random_walk)
+            submatrix_q = submatrix_q[num_of_ranked:_length, num_of_ranked:_length]
+            identity_matrix = np.diag(np.full((_length - num_of_ranked,), 1, dtype=np.float64))
             fundamental_matrix = np.linalg.inv((identity_matrix - submatrix_q))
             all_one_vector = np.full(_length - num_of_ranked, 1, dtype=np.float64)
             n_visit = np.dot(fundamental_matrix, all_one_vector) / (_length - num_of_ranked)
             return n_visit.tolist()
 
+        print("Computing N visits for ranked states: object", id(self))
         teleporting_random_walk = teleporting_random_walk.tolist()
         visit_n = absorb_state(grank_one)
         for i in range(1, _length):
@@ -193,6 +212,7 @@ class TextSummarizer:
             sentence_index += num_of_ranked - 1
             visit_n = absorb_state(sentence_index)
 
+        print("Computing summary scores: object", id(self))
         scores = list(range(_length))
         for i in range(_length):
             scores[markov_chain_tracker.pop()] = _length - i
@@ -300,7 +320,11 @@ if __name__ == "__main__":
     indicated that the british prime minister gave permission to british air force tornado planes stationed to kuwait to 
     join the aerial bombardment against iraq.'''
 
-    tn = TextNormalizer(document3)
-    print(tn.raw_sents)
+    from samuel.test.test_document import single_test_document
+    tn = TextNormalizer(single_test_document)
     ts = TextSummarizer(tn.raw_sents, tn.sentences, 5)
-    print(ts.mmr("iphone", ts.grasshopper()[1])[0])
+    # summary, scores = ts.grasshopper()
+    # summary, scores = ts.continuous_lexrank()
+    summary, scores = ts.pointwise_divrank()
+    print(summary)
+    # print(ts.mmr("iphone",)[0])

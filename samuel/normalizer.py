@@ -87,9 +87,9 @@ class TextNormalizer:
 
         print("Filtering tokens and sentences: object", id(self))
         for sentence in document.sents:
-            self._raw_sents.append(" ".join(sentence.text.split()))
             accepted_tokens = list(filtered_tokens(sentence))
             if accepted_tokens:
+                self._raw_sents.append(" ".join(sentence.text.split()))
                 self._tokens.extend(accepted_tokens)
                 self._sentences.append(accepted_tokens)
         print("Text normalization done: object", id(self))
