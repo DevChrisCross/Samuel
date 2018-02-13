@@ -43,7 +43,8 @@ def api(data: Dict) -> Dict[str, Any]:
 
     # TEXT TOPIC MODELLER
     visualize = check_param(False, "visualize")
-    dashboard = build_dashboard(TextTopicModeller(t_normalizer.sentences, visualize))
+    dashboard_style = check_param(True, "dashboard_style")
+    dashboard = build_dashboard(TextTopicModeller(t_normalizer.sentences, visualize),dashboard_style)
 
     # TEXT SUMMARIZER
     summary_length = data['summary_length']
@@ -64,10 +65,10 @@ def api(data: Dict) -> Dict[str, Any]:
     }
 
 
-def build_dashboard(data):
-    dashboard_head = '<link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/bmabey/pyLDAvis/files/ldavis.v1.0.0.css">\n' \
-                     '<div id="ldavis_el70603330337764279074628"></div>\n'
-    dashboard_script1 = '<script type="text/javascript">\n' \
+def build_dashboard(data, dashboard_style = True):
+    dashboard_head = '<link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/bmabey/pyLDAvis/files/ldavis.v1.0.0.css">\n'
+    dashboard_script1 = '<div id="ldavis_el70603330337764279074628"></div>\n' \
+                        '<script type="text/javascript">\n' \
                         'var ldavis_el70603330337764279074628_data = ' + str(data) + ';\n'
     dashboard_script2 = 'function LDAvis_load_lib(url, callback){' \
                         'var s = document.createElement("script");' \
@@ -95,7 +96,7 @@ def build_dashboard(data):
                         '})' \
                         '});' \
                         '}'
-    return dashboard_head + dashboard_script1 + dashboard_script2
+    return (dashboard_head + dashboard_script1 + dashboard_script2) if dashboard_style else (dashboard_script1 + dashboard_script2)
 
 
 kingsman = "Another witty and fun, action film by Matthew Vaughn. " \

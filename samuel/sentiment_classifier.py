@@ -27,15 +27,15 @@ class TextSentimentClassifier:
             final_sentiment = "neutral"
         else:
             final_sentiment = "positive" if polarity_scores["compound"] > 0 else 'negative'
-
-        positive = polarity_scores['pos'] * 100
-        negative = polarity_scores['neg'] * 100
-        neutral = str(round(polarity_scores["neu"], 2) * 100) + '%'
+            
+        positive = polarity_scores['pos']
+        negative = polarity_scores['neg']
+        neutral = str(round(polarity_scores["neu"] * 100,2))+" %"
         # norm = np.linalg.norm([positive, negative], ord=1)
         # positive /= norm
         # negative /= norm
-        positive = str(round(positive, 2) * 100) + '%'
-        negative = str(round(negative, 2) * 100) + '%'
+        positive = str(round(positive * 100))+" %"
+        negative = str(round(negative * 100))+" %"
 
         self._scores = {
             "final_sentiment": final_sentiment,
