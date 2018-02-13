@@ -24,8 +24,15 @@ def samuel_api():
 
 
 @app.route('/samuel_init', methods=['GET'])
-def data_entry():
+def samuel_init():
     return jsonify(Samuel.init(request.args.get('KEY')))
+
+@app.route('/samuel_validate', methods=['GET','POST'])
+def samuel_validate():
+    if valid(request.args.get('KEY')):
+        return "<h1>Valid API Key</h1>"
+    else:
+        return "<h1>Invalid API Key</h1>"
 
 
 if __name__ == '__main__':

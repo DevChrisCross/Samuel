@@ -18,7 +18,7 @@ def translate(text: str, translate_from=Language.TAGALOG.value, translate_to=Lan
 
 
 class TranslatorManager:
-    def __init__(self, text: str, character_threshold: int = 14500,
+    def __init__(self, text: str, character_threshold: int = 4500,
                  translate_from: Language = Language.TAGALOG.value, translate_to: Language = Language.ENGLISH.value):
         tokens = text.split()
 
@@ -52,5 +52,5 @@ class TranslatorManager:
 
 
 if __name__ == "__main__":
-    from samuel.test.test_document import single_test_document
+    from test.test_document import single_test_document
     print(TranslatorManager(single_test_document).translated_text)

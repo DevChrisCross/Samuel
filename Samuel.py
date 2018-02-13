@@ -1,5 +1,5 @@
 from samuel.normalizer import TextNormalizer, Property
-from samuel.translator import translate as text_translator, Language
+from samuel.translator import TranslatorManager, Language
 from samuel.summarizer import TextSummarizer
 from samuel.topic_modeller import TextTopicModeller
 from samuel.sentiment_classifier import TextSentimentClassifier
@@ -28,8 +28,7 @@ def api(data: Dict) -> Dict[str, Any]:
     # TEXT TRANSLATOR
     translate_from = check_param(Language.TAGALOG.value, "translate_from")
     translate_to = check_param(Language.ENGLISH.value, "translate_to")
-    translate = check_param(False, 'translate')
-    text = text_translator(text, translate, translate_from, translate_to)
+    text = TranslatorManager(text, translate_from = translate_from, translate_to=translate_to).translated_text
 
     # TEXT NORMALIZER
     t_normalizer = TextNormalizer(text)
