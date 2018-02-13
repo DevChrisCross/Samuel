@@ -13,8 +13,8 @@ class Language(Enum):
     ENGLISH = "en"
 
 
-def translate(corpus: str, enabled=False, translate_from=Language.TAGALOG.value, translate_to=Language.ENGLISH.value):
-    return corpus if not enabled else translator.translate(corpus, translate_to, translate_from).text
+def translate(text: str, translate_from=Language.TAGALOG.value, translate_to=Language.ENGLISH.value):
+    return translator.translate(text, translate_to, translate_from).text
 
 
 class TranslatorManager:
