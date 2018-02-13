@@ -6,7 +6,7 @@ import nltk
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 from itertools import product
-from typing import Dict, Type
+from typing import Dict, Type, List
 from textwrap import indent
 from samuel.constants.taggers import *
 warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
@@ -403,80 +403,3 @@ class TextNormalizer:
         "NOUN": wordnet.NOUN,
         "ADV": wordnet.ADV
     }
-
-
-class SentiText:
-    """
-    Identify sentiment-relevant string-level properties of input text.
-    """
-
-    def __init__(self, text):
-        if not isinstance(text, str):
-            text = str(text.encode('utf-8'))
-        self.text = text
-        from samuel import normalizer
-        self.words_and_emoticons = normalizer.TextNormalizer(text).tokens
-        # doesn't separate words from adjacent punctuation (keeps emoticons & contractions)
-        self.is_cap_diff = SentiText.allcap_differential(self.words_and_emoticons)
-
-    @staticmethod
-    def allcap_differential(words):
-        """
-        Check whether just some words in the input are ALL CAPS
-
-        :param list words: The words to inspect
-        :returns: `True` if some but not all items in `words` are ALL CAPS
-        """
-        is_different = False
-        allcap_words = 0
-        for word in words:
-            if word.isupper():
-                allcap_words += 1
-        cap_differential = len(words) - allcap_words
-        if 0 < cap_differential < len(words):
-            is_different = True
-        return is_different
-
-    def _words_and_emoticons(self):
-        """
-        Removes leading and trailing punctuations
-        Leaves contractions and most emoticons
-        Does not preserve punctuation-plus-letter emoticons (e.g. :D)
-        """
-        wes = self.text.split()
-        words_punc_dict = self._words_plus_punc(self.text)
-        wes = [we for we in wes if len(we) > 1]
-        for i, we in enumerate(wes):
-            if we in words_punc_dict:
-                wes[i] = words_punc_dict[we]
-        return wes
-
-    @staticmethod
-    def _words_plus_punc(text: str):
-        """
-        Returns mapping of form:
-        {
-            'cat,': 'cat',
-            ',cat': 'cat',
-        }
-        """
-
-        words = SentiText.__remove_punctuations(text)
-        words = set(word for word in words if len(word) > 1)
-        # the product gives ('cat', ',') and (',', 'cat')
-        punc_before = {''.join(p): p[1] for p in product(SentiText.PUNCTUATIONS, words)}
-        punc_after = {''.join(p): p[0] for p in product(words, SentiText.PUNCTUATIONS)}
-        words_punc_dict = punc_before
-        words_punc_dict.update(punc_after)
-        return words_punc_dict
-
-    @staticmethod
-    def __remove_punctuations(text):
-        punctuation_regex_string = '[{}]'.format(re.escape(string.punctuation))
-        punctuation_regex_compiled = re.compile(pattern=punctuation_regex_string)
-        clean_text = punctuation_regex_compiled.sub(repl='', string=text)
-        return clean_text.split()
-
-    PUNCTUATIONS = [
-        ".", "!", "?", ",", ";", ":", "-", "'", "\"", "!!", "!!!", "??", "???", "?!?", "!?!", "?!?!", "!?!?"
-    ]

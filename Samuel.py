@@ -1,29 +1,26 @@
-from samuel.old_normalizer import TextNormalizer
-from samuel.TextTranslator import translate as text_translator, Language
-from samuel.old_summarizer import TextSummarizer, Rank, Rerank
-from samuel.TextTopicModeller import topic_modelling
-from samuel.sentiment_classifier import unsupervised_extractor
+from samuel.normalizer import TextNormalizer, Property
+from samuel.translator import translate as text_translator, Language
+from samuel.summarizer import TextSummarizer
+from samuel.topic_modeller import TextTopicModeller
+from samuel.sentiment_classifier import TextSentimentClassifier
 from warnings import filterwarnings
 from enum import Enum
-from typing import Type
-
+from typing import Type, Dict, Any
 filterwarnings(action='ignore')
 
 
-def init(KEY: str):
+def init(key: str) -> Dict[str, Any]:
     def parse_enum(enumeration: Type[Enum]):
         return {en.name: en.value for en in enumeration}
 
     return {
-        'Rank': parse_enum(TextSummarizer.Settings.Rank),
-        'Rerank': parse_enum(TextSummarizer.Settings.Rerank),
         'Language': parse_enum(Language),
-        'KEY': KEY
+        'KEY': key
     }
 
 
-def api(data):
-    def check_param(default, param: str):
+def api(data: Dict) -> Dict[str, Any]:
+    def check_param(default: Any, param: str):
         return default if param not in data else data[param]
 
     text = data['text']
@@ -35,44 +32,32 @@ def api(data):
     text = text_translator(text, translate, translate_from, translate_to)
 
     # TEXT NORMALIZER
-    normalizer_settings = (TextNormalizer.Settings())
-    normalized_text = TextNormalizer(text, normalizer_settings)
+    t_normalizer = TextNormalizer(text)
 
     # TEXT SENTIMENT CLASSIFIER
-    threshold_classifier = check_param(0.1, "threshold_classifier")
-    verbose = check_param(False, "verbose")
-    sentiment_classifier = unsupervised_extractor(text, threshold_classifier, verbose)
+    neu_threshold = check_param(0.1, "threshold_classifier")
+    t_normalizer2 = TextNormalizer(text, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char},
+                                   min_word_length=2)
+    sentiment_classifier = TextSentimentClassifier(text, t_normalizer2.tokens,
+                                                   neutrality_threshold=neu_threshold).sentiment_score
 
     # TEXT TOPIC MODELLER
     visualize = check_param(False, "visualize")
-    dashboard = build_dashboard(topic_modelling(normalized_text().normalized_text, visualize))
+    dashboard = build_dashboard(TextTopicModeller(t_normalizer.sentences, visualize))
 
     # TEXT SUMMARIZER
     summary_length = data['summary_length']
     sort_by_score = check_param(False, "sort_by_score")
-    rank = check_param("D", "rank")
-    rerank = check_param(None, "rerank")
     query = check_param(None, "query")
 
-    def summarizer_settings():
-        _rank = Rank.GRASSHOPPER
-
-        if rank == Rank.DIVRANK.value:
-            _rank = Rank.DIVRANK
-        elif rank == Rank.LEXRANK.value:
-            _rank = Rank.LEXRANK
-        elif rank == Rank.GRASSHOPPER.value:
-            _rank = Rank.GRASSHOPPER
-
-        if query is not None:
-            return TextSummarizer.Settings(_rank, Rerank.MAXIMAL_MARGINAL_RELEVANCE, query)
-        else:
-            return TextSummarizer.Settings(_rank, rerank)
-
-    summarize_text = TextSummarizer(normalized_text, summarizer_settings())
+    summarizer = TextSummarizer(t_normalizer.raw_sents, t_normalizer.sentences,
+                                summary_length=summary_length, sort_by_score=sort_by_score)
+    summary, scores = summarizer.grasshopper()
+    if query:
+        summary, scores = summarizer.mmr(query, scores)
 
     return {
-        'summarized_text': summarize_text(summary_length, sort_by_score).summary_text,
+        'summarized_text': summary,
         'polarity': sentiment_classifier['final_sentiment'],
         'percentage': sentiment_classifier['percentage'],
         'dashboard': dashboard
@@ -156,10 +141,3 @@ text3 = "I have missed iOS a lot over the last 3 years and it feels good to be b
         "apps such as Google photos. For example, I always have to keep Google Photos running in order to allow " \
         "background upload, which makes no sense. Same goes for OneDrive. Overall, navigation around the OS is easy " \
         "and convenient. "
-
-# testing = {
-#     'text': text1+text2+text3,
-#     'summary_length': 5
-# }
-#
-# pprint(api(testing))
