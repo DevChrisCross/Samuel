@@ -1,5 +1,5 @@
 import numpy as np
-from samuel.normalizer import TextNormalizer
+from samuel.normalizer import TextNormalizer, NormalizerManager
 from typing import List, Dict, Tuple, Callable, Iterable, Union
 
 
@@ -38,17 +38,13 @@ class TextSummarizer:
         inv_doc_freq = np.divide(inv_doc_freq, np.sum(term_freq, axis=0))
         tf_idf = np.multiply(term_freq, inv_doc_freq)
 
-        def cos_matrix():
-            for i in range(len(tf_idf)):
-                vector = np.zeros((len(tf_idf),), dtype=np.float64)
-                for j in range(len(tf_idf)):
-                    value = (np.sum(np.multiply.reduce([term_freq[i], term_freq[j], np.square(inv_doc_freq)]))
-                             / (np.linalg.norm(tf_idf[i]) * np.linalg.norm(tf_idf[j])))
-                    vector[j] = value
-                yield vector
+        inv_doc_freq = np.repeat([np.square(inv_doc_freq)], len(term_freq), axis=0)
+        init_cos_matrix = np.dot(term_freq, np.transpose(np.multiply(term_freq, inv_doc_freq)))
+        norms = np.array([np.linalg.norm(tf_idf[i]) for i in range(len(tf_idf))], dtype=np.float64)
+        matrix_norm = np.outer(norms, norms)
+        cos_matrix = np.divide(init_cos_matrix, matrix_norm)
 
-
-        return np.array(list(cos_matrix()), dtype=np.float64)
+        return cos_matrix
 
     @staticmethod
     def __apply_cos_threshold(cos_matrix: np.ndarray, threshold: float = 0.1) -> np.ndarray:
@@ -320,11 +316,13 @@ if __name__ == "__main__":
     indicated that the british prime minister gave permission to british air force tornado planes stationed to kuwait to 
     join the aerial bombardment against iraq.'''
 
-    from samuel.test.test_document import single_test_document
-    tn = TextNormalizer(single_test_document)
-    ts = TextSummarizer(tn.raw_sents, tn.sentences, 5)
-    # summary, scores = ts.grasshopper()
+    from samuel.test.test_document import single_test_document, test_documents
+    # tn = TextNormalizer(single_test_document)
+    tn = NormalizerManager(test_documents)
+    ts = TextSummarizer(tn.raw_sents, tn.sentences, 20)
+    summary, scores = ts.grasshopper()
+    summary, scores = ts.mmr("Joe Ragan", scores)
     # summary, scores = ts.continuous_lexrank()
-    summary, scores = ts.pointwise_divrank()
+    # summary, scores = ts.pointwise_divrank()
     print(summary)
     # print(ts.mmr("iphone",)[0])
