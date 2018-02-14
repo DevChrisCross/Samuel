@@ -14,7 +14,7 @@ class Language(Enum):
 
 
 def translate(text: str, translate_from=Language.TAGALOG.value, translate_to=Language.ENGLISH.value):
-    return translator.translate(text, translate_to, translate_from).text
+    return translator.translate(text=text, dest=translate_to, src=translate_from).text
 
 
 class TranslatorManager:
@@ -52,5 +52,5 @@ class TranslatorManager:
 
 
 if __name__ == "__main__":
-    from test.test_document import single_test_document
+    from samuel.test.test_document import single_test_document
     print(TranslatorManager(single_test_document).translated_text)

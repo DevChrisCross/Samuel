@@ -184,6 +184,7 @@ class TextSummarizer:
         def absorb_state(index: int) -> Iterable[float]:
             sentence_index = markov_chain_tracker.pop(index)
             markov_chain_tracker.insert(0, sentence_index)
+            print("Absorbed state: sentence", sentence_index)
 
             absorbing_state = np.full((_length,), 0, dtype=np.float64)
             absorbing_state[index] = 1
@@ -203,6 +204,7 @@ class TextSummarizer:
         teleporting_random_walk = teleporting_random_walk.tolist()
         visit_n = absorb_state(grank_one)
         for i in range(1, _length):
+            print("N visit iteration:", i)
             num_of_ranked += 1
             sentence_index = visit_n.index(max(visit_n))
             sentence_index += num_of_ranked - 1
@@ -217,11 +219,14 @@ class TextSummarizer:
         return self.__score_aggregator(scores)
 
     def mmr(self, query: str, score_sents: List[Dict[str, Union[float, str]]], _lambda: float = 0.7):
+        print("Reconstructing cosine matrix: object", id(self))
         q = TextNormalizer(query)
         norm_sents = self._norm_sents[:]
         norm_sents.append(q.tokens)
         cosine_matrix = TextSummarizer.__build_cosine_matrix(norm_sents)
         mmr_scores = list()
+        if cosine_matrix[-1][-1] == np.nan:
+            raise ValueError("Invalid query")
 
         def compute_mmr(index):
             similarity_scores = [cosine_matrix[index][s["index"]] for s in mmr_scores]
@@ -229,6 +234,7 @@ class TextSummarizer:
             mmr = _lambda * (cosine_matrix[index][-1] - (1 - _lambda) * maximum_similarity)
             return mmr
 
+        print("Computing mmr scores: object", id(self))
         while score_sents:
             sentence = max(score_sents, key=lambda s: s["score"])
             sentence["score"] = compute_mmr(sentence["index"])
@@ -317,11 +323,11 @@ if __name__ == "__main__":
     join the aerial bombardment against iraq.'''
 
     from samuel.test.test_document import single_test_document, test_documents
-    # tn = TextNormalizer(single_test_document)
-    tn = NormalizerManager(test_documents)
-    ts = TextSummarizer(tn.raw_sents, tn.sentences, 20)
+    tn = TextNormalizer(single_test_document)
+    # tn = NormalizerManager(single_test_document)
+    ts = TextSummarizer(tn.raw_sents, tn.sentences, 10)
     summary, scores = ts.grasshopper()
-    summary, scores = ts.mmr("Joe Ragan", scores)
+    summary, scores = ts.mmr("I literally have never heard the phrase “MMA gloves” and I listen to the JRE at least once a week.", scores)
     # summary, scores = ts.continuous_lexrank()
     # summary, scores = ts.pointwise_divrank()
     print(summary)

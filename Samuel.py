@@ -26,9 +26,9 @@ def api(data: Dict) -> Dict[str, Any]:
     text = data['text']
 
     # TEXT TRANSLATOR
-    translate_from = check_param(Language.TAGALOG.value, "translate_from")
-    translate_to = check_param(Language.ENGLISH.value, "translate_to")
-    text = TranslatorManager(text, translate_from = translate_from, translate_to=translate_to).translated_text
+    # translate_from = check_param(Language.TAGALOG.value, "translate_from")
+    # translate_to = check_param(Language.ENGLISH.value, "translate_to")
+    # text = TranslatorManager(text, translate_from = translate_from, translate_to=translate_to).translated_text
 
     # TEXT NORMALIZER
     t_normalizer = TextNormalizer(text)
@@ -43,7 +43,7 @@ def api(data: Dict) -> Dict[str, Any]:
     # TEXT TOPIC MODELLER
     visualize = check_param(False, "visualize")
     dashboard_style = check_param(True, "dashboard_style")
-    dashboard = build_dashboard(TextTopicModeller(t_normalizer.sentences, visualize),dashboard_style)
+    dashboard = build_dashboard(TextTopicModeller(t_normalizer.sentences, visualize), dashboard_style)
 
     # TEXT SUMMARIZER
     summary_length = data['summary_length']
@@ -54,7 +54,10 @@ def api(data: Dict) -> Dict[str, Any]:
                                 summary_length=summary_length, sort_by_score=sort_by_score)
     summary, scores = summarizer.grasshopper()
     if query:
-        summary, scores = summarizer.mmr(query, scores)
+        try:
+            summary, scores = summarizer.mmr(query, scores)
+        except ValueError as ve:
+            pass
 
     return {
         'summarized_text': summary,

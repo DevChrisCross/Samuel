@@ -8,7 +8,8 @@ cors = CORS(app)
 
 
 def valid(api_key):
-    return requests.get("http://samuelapi/validate_key?key="+api_key).json()
+    return requests.get("http://192.168.43.18/validate_key?key="+api_key).json()
+
 
 @app.route('/')
 def get_tasks():
@@ -18,7 +19,12 @@ def get_tasks():
 @app.route('/samuel_api', methods=['POST', 'GET'])
 def samuel_api():
     if valid(request.args.get('KEY')):
-        return jsonify(Samuel.api(request.get_json()))
+        # try:
+        samuel = Samuel.api(request.get_json())
+        return jsonify(samuel)
+        # except Exception as ex:
+        #     print("SYSTEM ERROR")
+        #     return "SYSTEM ERROR"
     else:
         return "Invalid API Key"
 
@@ -26,6 +32,7 @@ def samuel_api():
 @app.route('/samuel_init', methods=['GET'])
 def samuel_init():
     return jsonify(Samuel.init(request.args.get('KEY')))
+
 
 @app.route('/samuel_validate', methods=['GET','POST'])
 def samuel_validate():

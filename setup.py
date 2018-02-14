@@ -46,7 +46,7 @@ setup(name='samuel',
           'gensim',
           'pyLDAvis',
           'googletrans',
-          'pytest-runner'
+          'pytest-runner', 'requests'
       ],
       zip_safe=False,
       setup_requires=['pytest-runner'],

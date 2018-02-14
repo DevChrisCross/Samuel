@@ -1,9 +1,9 @@
 import re
+import enchant
 import multiprocessing as mp
 from string import punctuation
 from textwrap import indent
-import enchant
-from typing import Set, List, Union
+from typing import Set, List, Union, Optional
 from warnings import filterwarnings
 from enum import Enum
 from os import cpu_count
@@ -11,6 +11,8 @@ from functools import partial
 from nltk.corpus import stopwords, wordnet
 from spacy import load, tokens
 from samuel.constants.taggers import *
+from html import unescape
+from nltk.corpus import wordnet
 filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
@@ -26,10 +28,12 @@ class TextNormalizer:
     _enchant_dict = enchant.Dict("en_US")
     _repeat_regex = re.compile(pattern=r"(\w*)(\w)\2(\w*)")
     _stop_words = stopwords.words("english")
+    _enchant = enchant.Dict("en_US")
+    _sc_regex = re.compile("[{}0-9]".format(re.escape(punctuation)))
 
     def __init__(self, text: str, enable: Set[Property] = None,
                  pos_filters: Set[str] = None, punct_filters: Set[str] = None,
-                 min_word_length: int = 1):
+                 min_word_length: int = 2, norm_threshold: int = 2, spell_threshold: int = 4):
         print("Setting up requirements: object", id(self))
         if pos_filters is None:
             pos_filters = set(TextNormalizer.POS_FILTER)
@@ -46,7 +50,7 @@ class TextNormalizer:
             enable = set()
 
         print("Normalizing text: object", id(self))
-        document = TextNormalizer._spacy_loader(text)
+        document = TextNormalizer._spacy_loader(unescape(text))
         self._raw_sents = list()
         self._sentences = list()
         self._tokens = list()
@@ -57,23 +61,32 @@ class TextNormalizer:
                     or token.is_quote or token.is_bracket
                     or token.like_email or token.like_num or token.like_url)
 
+        def contain_special_char(token: tokens.Token) -> Optional[bool]:
+            return self._sc_regex.search(token.text)
+
         def filtered_tokens(span: tokens.Span) -> str:
             for token in span:
                 base_word = token.lemma_
                 if (not base_word
+                        or contain_special_char(token)
                         or len(token.text) < min_word_length
                         or is_not_essential(token)
                         or (Property.Special_Char not in enable and token.text in punctuation)
                         or (token.text in punctuation and token.text not in punct_filters)
                         or (Property.Stop_Word not in enable
-                            and (token.is_stop or token.norm_ in TextNormalizer._stop_words))
-                        or token.pos_ not in pos_filters):
+                            and (token.is_stop
+                                 or token.norm_ in TextNormalizer._stop_words
+                                 or base_word in TextNormalizer._stop_words))
+                        or token.pos_ not in pos_filters
+                        or (not self._enchant.check(token.text) and not token.pos_ == "PROPN")):
                     continue
-                if token.is_stop or token.norm_ in TextNormalizer._stop_words:
+                if (token.is_stop
+                        or token.norm_ in TextNormalizer._stop_words
+                        or base_word in TextNormalizer._stop_words):
                     base_word = token.text
                 else:
                     if (Property.Spelling in enable
-                            and len(base_word) > 4
+                            and len(base_word) > spell_threshold
                             and token.pos_ in ["ADJ", "ADV", "NOUN", "VERB"]):
                         base_word = TextNormalizer.__correct_word(base_word)
                 if Property.Letter_Case in enable:
@@ -88,7 +101,7 @@ class TextNormalizer:
         print("Filtering tokens and sentences: object", id(self))
         for sentence in document.sents:
             accepted_tokens = list(filtered_tokens(sentence))
-            if accepted_tokens:
+            if accepted_tokens and len(accepted_tokens) > norm_threshold:
                 self._raw_sents.append(" ".join(sentence.text.split()))
                 self._tokens.extend(accepted_tokens)
                 self._sentences.append(accepted_tokens)
@@ -212,7 +225,8 @@ class NormalizerManager:
 
 
 if __name__ == "__main__":
-    # print(TextNormalizer(document, enable={Property.Spelling}))
+    from samuel.test.test_document import single_test_document
+    print(TextNormalizer(unescape("Sample me with this one on the line")))
     # cProfile.run("TextNormalizer(document, enable={Property.Spelling})", "Text_Normalizer")
     # tn_profiler = pstats.Stats("Text_Normalizer")
     # tn_profiler.strip_dirs().sort_stats("cumulative").print_stats(10)
