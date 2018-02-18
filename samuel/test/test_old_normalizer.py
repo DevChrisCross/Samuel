@@ -1,4 +1,4 @@
-from samuel.old_normalizer import TextNormalizer
+from samuel.old.old_normalizer import TextNormalizer
 
 
 def test_old_normalizer():

@@ -5,6 +5,10 @@ from samuel.constants.vader import *
 
 class TextSentimentClassifier:
     def __init__(self, text: str, tokens: List[str], neutrality_threshold: float = 0.1):
+        self._id = id(self)
+        self._name = self.__class__.__name__
+
+        print(self._name, self._id, "Setting up requirements")
         if not isinstance(text, str):
             text = str(text.encode('utf-8'))
         self._text = text
@@ -21,6 +25,7 @@ class TextSentimentClassifier:
             is_different = True
 
         self._is_cap_diff = is_different
+        print(self._name, self._id, "Computing word valences and polarity score")
         polarity_scores = self.__polarity_scores()
 
         if neutrality_threshold * -1 < polarity_scores["compound"] < neutrality_threshold:
@@ -32,6 +37,7 @@ class TextSentimentClassifier:
         positive = "{0:.2f} %".format(polarity_scores['pos'] * 100)
         negative = "{0:.2f} %".format(polarity_scores['neg'] * 100)
 
+        print(self._name, self._id, "Sentiment classification done")
         self._scores = {
             "final_sentiment": final_sentiment,
             "compound": polarity_scores["compound"],

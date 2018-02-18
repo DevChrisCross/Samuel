@@ -3,12 +3,13 @@ import enchant
 import multiprocessing as mp
 from string import punctuation
 from textwrap import indent
-from typing import Set, List, Union, Optional
+from typing import Set, List, Union, Optional, Tuple
 from warnings import filterwarnings
 from enum import Enum
-from os import cpu_count
+from nltk import sent_tokenize
 from functools import partial
-from nltk.corpus import stopwords, wordnet
+from nltk.corpus import stopwords
+from numpy import ceil
 from spacy import load, tokens
 from samuel.constants.taggers import *
 from html import unescape
@@ -34,7 +35,10 @@ class TextNormalizer:
     def __init__(self, text: str, enable: Set[Property] = None,
                  pos_filters: Set[str] = None, punct_filters: Set[str] = None,
                  min_word_length: int = 2, norm_threshold: int = 2, spell_threshold: int = 4):
-        print("Setting up requirements: object", id(self))
+        self._id = id(self)
+        self._name = self.__class__.__name__
+
+        print(self._name, self._id, "Setting up requirements")
         if pos_filters is None:
             pos_filters = set(TextNormalizer.POS_FILTER)
         if enable:
@@ -49,7 +53,7 @@ class TextNormalizer:
             punct_filters = set()
             enable = set()
 
-        print("Normalizing text: object", id(self))
+        print(self._name, self._id, "Normalizing text")
         document = TextNormalizer._spacy_loader(unescape(text))
         self._raw_sents = list()
         self._sentences = list()
@@ -98,14 +102,14 @@ class TextNormalizer:
                     base_word = base_word.lower()
                 yield base_word
 
-        print("Filtering tokens and sentences: object", id(self))
+        print(self._name, self._id, "Filtering tokens and sentences")
         for sentence in document.sents:
             accepted_tokens = list(filtered_tokens(sentence))
             if accepted_tokens and len(accepted_tokens) > norm_threshold:
                 self._raw_sents.append(" ".join(sentence.text.split()))
                 self._tokens.extend(accepted_tokens)
                 self._sentences.append(accepted_tokens)
-        print("Text normalization done: object", id(self))
+        print(self._name, self._id, "Text normalization done")
 
     @staticmethod
     def __correct_word(word: str) -> str:
@@ -162,38 +166,23 @@ class TextNormalizer:
 class NormalizerManager:
     def __init__(self, documents: Union[List[str], str], enable: Set[Property] = None,
                  pos_filters: Set[str] = None, punct_filters: Set[str] = None,
-                 min_word_length: int = 1, batch_count: int = None):
+                 min_word_length: int = 1, batch_size: int = 200):
+        self._id = id(self)
+        self._name = self.__class__.__name__
+
         self._raw_sents = list()
         self._sentences = list()
         self._tokens = list()
 
         if isinstance(documents, str):
-            print("Preparing document batches: object", (id(self)))
-            documents = load("en")(documents)
-            sentences = [sentence for sentence in documents.sents]
-            batch_count = batch_count if batch_count else cpu_count()
-            divider = len(sentences) // batch_count
+            print(self._name, self._id, "Preparing document batches")
+            self._partitions = NormalizerManager.partitioned_docs(documents, batch_size)
 
-            def partitioned_docs() -> str:
-                start_divider = 0
-                for i in range(batch_count):
-                    start_divider = start_divider
-                    end_divider = start_divider + divider
-                    if i == 3:
-                        end_divider += len(sentences) % batch_count
-                    yield " ".join([sentence.text for sentence in sentences[start_divider:end_divider]])
-                    start_divider += divider
-
-            documents = list(partitioned_docs())
-
-        print("Preparing process pool: object", (id(self)))
+        print(self._name, self._id, "Preparing process pool")
         pool = mp.Pool()
-        print("Mapping document batches: object", (id(self)))
+        print(self._name, self._id, "Mapping document batches")
         result = pool.map_async(partial(TextNormalizer, enable=enable, pos_filters=pos_filters,
                                 punct_filters=punct_filters, min_word_length=min_word_length), documents)
-
-        if result.get():
-            print("Reducing document results: object", (id(self)))
         for tn in result.get():
             self._raw_sents.extend(tn.raw_sents)
             self._sentences.extend(tn.sentences)
@@ -201,7 +190,24 @@ class NormalizerManager:
 
         pool.close()
         pool.join()
-        print("Normalization pooling done: object", (id(self)))
+        print(self._name, self._id, "Normalization pooling done")
+
+    @staticmethod
+    def partitioned_docs(documents: str, batch_size: int = 200) -> List[str]:
+        sentences = list(sent_tokenize(documents))
+        batch_count = int(ceil(len(sentences) / batch_size))
+
+        def _partition() -> str:
+            start_divider = 0
+            for i in range(batch_count):
+                start_divider = start_divider
+                end_divider = start_divider + batch_size
+                if i == batch_count - 1:
+                    end_divider = len(sentences)
+                yield " ".join(sentences[start_divider:end_divider])
+                start_divider += batch_size
+
+        return list(_partition())
 
     @property
     def raw_sents(self):
@@ -215,6 +221,10 @@ class NormalizerManager:
     def tokens(self):
         return self._tokens
 
+    @property
+    def partitions(self):
+        return self._partitions
+
     def __str__(self):
         return "\n".join([
             "Normalized Sentences",
@@ -225,8 +235,8 @@ class NormalizerManager:
 
 
 if __name__ == "__main__":
-    from samuel.test.test_document import single_test_document
-    print(TextNormalizer(unescape("Sample me with this one on the line")))
+    # from samuel.test.test_document import single_test_document
+    # print(NormalizerManager(single_test_document))
     # cProfile.run("TextNormalizer(document, enable={Property.Spelling})", "Text_Normalizer")
     # tn_profiler = pstats.Stats("Text_Normalizer")
     # tn_profiler.strip_dirs().sort_stats("cumulative").print_stats(10)

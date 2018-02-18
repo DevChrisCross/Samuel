@@ -3,7 +3,7 @@ from enum import Enum
 from functools import partial
 import multiprocessing as mp
 
-translator = Translator(service_urls=[
+__translator = Translator(service_urls=[
     'translate.google.com',
 ])
 
@@ -14,7 +14,7 @@ class Language(Enum):
 
 
 def translate(text: str, translate_from=Language.TAGALOG.value, translate_to=Language.ENGLISH.value):
-    return translator.translate(text=text, dest=translate_to, src=translate_from).text
+    return __translator.translate(text=text, dest=translate_to, src=translate_from).text
 
 
 class TranslatorManager:
@@ -52,5 +52,6 @@ class TranslatorManager:
 
 
 if __name__ == "__main__":
-    from samuel.test.test_document import single_test_document
-    print(TranslatorManager(single_test_document).translated_text)
+    # from samuel.test.test_document import single_test_document
+    # print(TranslatorManager(single_test_document).translated_text)
+    pass

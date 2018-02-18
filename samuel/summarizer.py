@@ -6,14 +6,16 @@ from typing import List, Dict, Tuple, Callable, Iterable, Union
 class TextSummarizer:
     def __init__(self, raw_sents: List[str], norm_sents: List[List[str]], summary_length: int,
                  sort_by_score: bool = False):
+        self._id = id(self)
+        self._name = self.__class__.__name__
+
         self._sort_by_score = sort_by_score
         self._summary_length = summary_length
         self._sentences = raw_sents
         self._norm_sents = norm_sents
-        self._cosine_matrix = TextSummarizer.__build_cosine_matrix(norm_sents)
+        self._cosine_matrix = self.__build_cosine_matrix(norm_sents)
 
-    @staticmethod
-    def __build_cosine_matrix(sentences: List[List[str]]) -> np.ndarray:
+    def __build_cosine_matrix(self, sentences: List[List[str]]) -> np.ndarray:
         def word_dict() -> Dict[str, int]:
             index = 0
             word_set = set()
@@ -31,7 +33,7 @@ class TextSummarizer:
                     vector[dictionary[word]] += 1
                 yield vector
 
-        print("Constructing cosine similarity matrix: @TextNormalizer", )
+        print(self._name, self._id, "Constructing cosine similarity matrix")
         word_dictionary = {word: i for word, i in word_dict()}
         term_freq = np.array([vector for vector in word_vec(word_dictionary)], dtype=np.float64)
         inv_doc_freq = np.full((len(word_dictionary),), np.log(float(len(term_freq))), dtype=np.float64)
@@ -81,7 +83,7 @@ class TextSummarizer:
         return states[time_t]
 
     def __score_aggregator(self, scores: np.ndarray) -> Tuple[str, List[Dict[str, Union[float, str]]]]:
-        print("Aggregating scores and summary: object", id(self))
+        print(self._name, self._id, "Aggregating scores and summary")
         score_sents = [{"index": i, "score": scores[i-1], "sentence": sentence}
                        for i, sentence in enumerate(self._sentences)]
         score_sents.sort(key=lambda sentence: sentence["score"], reverse=True)
@@ -89,23 +91,25 @@ class TextSummarizer:
         if not self._sort_by_score:
             summary.sort(key=lambda sentence: sentence["index"], reverse=True)
         summary_text = " ".join([sentence["sentence"] for sentence in summary])
-        print("Summarization done: object", id(self))
+        print(self._name, self._id, "Summarization done")
         return summary_text, score_sents
 
     def continuous_lexrank(self, damping_factor: float = 0.85):
-        _length = len(self._norm_sents)
-        _damping_factor = damping_factor
+        # _length = len(self._norm_sents)
+        # _damping_factor = damping_factor
 
         def state_func(t_matrix: np.ndarray, prev_state: np.ndarray) -> np.ndarray:
-            for u in range(_length):
-                state = np.sum([t_matrix[u, v] / np.sum(t_matrix[:, v]) for v in range(_length)])
-                state *= prev_state[u]
-                state *= (1 - _damping_factor)
-                state += _damping_factor / _length
-                yield state
+            # for u in range(_length):
+            #     state = np.sum([t_matrix[u, v] / np.sum(t_matrix[:, v]) for v in range(_length)])
+            #     state *= prev_state[u]
+            #     state *= (1 - _damping_factor)
+            #     state += _damping_factor / _length
+            #     yield state
+            return np.dot(t_matrix.transpose(), prev_state)
 
-        transition_matrix = np.array(list(self.__apply_right_stochastic(self._cosine_matrix)), dtype=np.float64)
-        print("Computing stationary distribution: object", id(self))
+        transition_matrix = np.array(list(self.__apply_cos_threshold(self._cosine_matrix)), dtype=np.float64)
+        transition_matrix = np.array(list(self.__apply_right_stochastic(transition_matrix)), dtype=np.float64)
+        print(self._name, self._id, "Computing stationary distribution")
         scores = TextSummarizer.__power_method(transition_matrix, state_func)
         return self.__score_aggregator(scores)
 
@@ -154,13 +158,13 @@ class TextSummarizer:
         _length = len(self._norm_sents)
         _alpha = alpha
 
-        print("Establishing transition matrix: object", id(self))
+        print(self._name, self._id, "Establishing transition matrix")
         transition_matrix = self._cosine_matrix
         transition_matrix = np.array(list(self.__apply_cos_threshold(transition_matrix)), dtype=np.float64)
         transition_matrix = np.array(list(self.__apply_right_stochastic(transition_matrix)), dtype=np.float64)
         transition_matrix = np.multiply(_lambda, transition_matrix)
 
-        print("Establishing a teleporting random walk: object", id(self))
+        print(self._name, self._id, "Establishing a teleporting random walk")
         if not prior_distribution:
             if alpha:
                 prior_distribution = np.array([np.power(i + 1, _alpha * -1) for i in range(_length)], dtype=np.float64)
@@ -176,7 +180,7 @@ class TextSummarizer:
         def state_func(t_matrix: np.ndarray, prev_state: np.ndarray) -> np.ndarray:
             return np.dot(t_matrix.transpose(), prev_state)
 
-        print("Computing stationary distribution: object", id(self))
+        print(self._name, self._id, "Computing stationary distribution")
         stationary_distribution = TextSummarizer.__power_method(teleporting_random_walk, state_func).tolist()
         grank_one = stationary_distribution.index(max(stationary_distribution))
         num_of_ranked = 1
@@ -184,7 +188,7 @@ class TextSummarizer:
         def absorb_state(index: int) -> Iterable[float]:
             sentence_index = markov_chain_tracker.pop(index)
             markov_chain_tracker.insert(0, sentence_index)
-            print("Absorbed state: sentence", sentence_index)
+            print(self._name, self._id, "Absorbed state: sentence", sentence_index)
 
             absorbing_state = np.full((_length,), 0, dtype=np.float64)
             absorbing_state[index] = 1
@@ -200,17 +204,17 @@ class TextSummarizer:
             n_visit = np.dot(fundamental_matrix, all_one_vector) / (_length - num_of_ranked)
             return n_visit.tolist()
 
-        print("Computing N visits for ranked states: object", id(self))
+        print(self._name, self._id, "Computing N visits for ranked states")
         teleporting_random_walk = teleporting_random_walk.tolist()
         visit_n = absorb_state(grank_one)
         for i in range(1, _length):
-            print("N visit iteration:", i)
+            print(self._name, self._id, "N visit iteration:", i)
             num_of_ranked += 1
             sentence_index = visit_n.index(max(visit_n))
             sentence_index += num_of_ranked - 1
             visit_n = absorb_state(sentence_index)
 
-        print("Computing summary scores: object", id(self))
+        print(self._name, self._id, "Computing summary scores")
         scores = list(range(_length))
         for i in range(_length):
             scores[markov_chain_tracker.pop()] = _length - i
@@ -219,11 +223,11 @@ class TextSummarizer:
         return self.__score_aggregator(scores)
 
     def mmr(self, query: str, score_sents: List[Dict[str, Union[float, str]]], _lambda: float = 0.7):
-        print("Reconstructing cosine matrix: object", id(self))
+        print(self._name, self._id, "Reconstructing cosine matrix")
         q = TextNormalizer(query)
         norm_sents = self._norm_sents[:]
         norm_sents.append(q.tokens)
-        cosine_matrix = TextSummarizer.__build_cosine_matrix(norm_sents)
+        cosine_matrix = self.__build_cosine_matrix(norm_sents)
         mmr_scores = list()
         if cosine_matrix[-1][-1] == np.nan:
             raise ValueError("Invalid query")
@@ -234,7 +238,7 @@ class TextSummarizer:
             mmr = _lambda * (cosine_matrix[index][-1] - (1 - _lambda) * maximum_similarity)
             return mmr
 
-        print("Computing mmr scores: object", id(self))
+        print(self._name, self._id, "Computing mmr scores: object")
         while score_sents:
             sentence = max(score_sents, key=lambda s: s["score"])
             sentence["score"] = compute_mmr(sentence["index"])
@@ -251,84 +255,14 @@ class TextSummarizer:
 
 
 if __name__ == "__main__":
-    document3 = """
-    Hands down, of all the smartphones I have used so far, iPhone 8 Plus got the best battery life. I am not a heavy user. 
-    All I do is make few quick calls, check emails, quick update of social media and maps and navigation once in a while. 
-    On average with light use (excluding maps and navigation), iPhone 8 Plus lasts for 4 full days! You heard it right, 
-    4 full days! At the end of the 4th day, I am usually left with 5-10% of battery and that's about the time I charge the phone. 
-    The heaviest I used it was once when I had to rely on GPS for a full day. I started with 100% on the day I was travelling and by the end of the day, 
-    I had around 70% left. And I was able get through the next two days without any issues (light use only).
-
-    The last iPhone I used was an iPhone 5 and it is very clear that the smartphone cameras have come a long way. 
-    iPhone 8 Plus produces very crisp photos without any over saturation, which is what I really appreciate. 
-    Even though I got used to Samsung's over saturated photos over the last 3 years, whenever I see a photo true to real life colours, 
-    it really appeals me. When buying this phone, my main concern with camera was its performance in low light as I was used to pretty awesome 
-    performance on my Note 4. iPhone 8 Plus did not disappoint me. I was able to capture some shots at a work function and they looked truly amazing. 
-    Auto HDR seems very on point in my opinion. You will see these in the link below. Portrait mode has been somewhat consistent. 
-    I felt that it does not perform as well on a very bright day. But overall, given that it is still in beta, it works quite well (See Camaro SS photo). 
-    Video recording wise, it is pretty good at the standard 1080p 30fps. I am yet to try any 4k 60fps shots. But based on what I have seen from tech reviewers, 
-    it is pretty awesome.
-
-    For a LCD panel, iPhone 8 Plus display is great. Colours are accurate and it gets bright enough for outdoor use. Being a 1080p panel, 
-    I think it really contributes to the awesome battery life that I have been experiencing. Talking about Touch ID, 
-    I think it still is the most convenient way to unlock your phone and make any payments. For me personally, it works 99% of the time and in my experience, 
-    it still is the benchmark of fingerprint unlocking of any given smartphone.
-
-    I have missed iOS a lot over the last 3 years and it feels good to be back. Super smooth and no hiccups. 
-    I know few people have experienced some bugs recently. I guess I was one of the lucky ones not to have any issues. 
-    Maybe it was already patched when I bought the phone. However, 
-    my only complaint is the fact that iOS still does not let you clear all notifications from a particular app at once. 
-    I really would like to see fixed in a future update. Customisation wise, I do not have any issues because I hardly customised my Note 4. 
-    Only widgets I had running were weather and calendar. Even then, I would still open up the actual app to seek more detail. However, 
-    I still do not use iCloud. I really wish Apple would have given us more online storage for backup. 
-    5GB is hardly enough these days to backup everything on your phone. One of my mates suggested that Apple should ship the phone with iCloud storage same as the phone. 
-    It surely would be awesome. But business wise, I cannot see Apple going ahead with such a decision. But in my opinion, 
-    iCloud users should get at least 15GB free. Coming from an Android, I thought it would make sense to keep using my Google account to 
-    sync contacts and photos as it would take away the hassle of setting everything up from scratch. Only issue is sometimes I feel like 
-    iOS restricting the background app refresh of Google apps such as Google photos. For example, I always have to keep Google Photos 
-    running in order to allow "background upload", which makes no sense. Same goes for OneDrive. Overall, navigation around the OS is easy and convenient.
-
-    I really think Apple Maps still needs lot of catching up. Over the last few weeks, I managed to use it couple of times. Navigation wise, it seem to 
-    be good. But when it comes to looking up a place just by name seems like a real pain in the ass. Literally nothing shows up! Maybe it is a different 
-    story in other countries. But for now, Google Maps is the number 1 on my list. 
-
-    People seem to be complaining about Apple's decision to stick with the same design for 4 generations of phones. To be honest I quite adore this design. 
-    It seems like a really timeless and well-aged design. The new glass back adds a little modern and polished look to the phone and it really helps grip 
-    the phone if you are not using a case. Overall, iPhone 8 Plus is a great smartphone for every day use, especially with that killer battery life. 
-    I do not really regret not getting an iPhone X, because in my opinion, first iteration will always be problematic. 8 Plus is the final iteration 
-    of that particular design and have constantly improved. I am sure for my usage, the specs are more than enough to get me through the next 2-3 years.
-    """
-
-    document1 = '''Iraqi vice president taha yassin ramadan announced today, sunday, that iraq refuses to back down from its
-    decision to stop cooperating with disarmament inspectors before its demands are met. iraqi vice president taha yassin
-    ramadan announced today, thursday, that iraq rejects cooperating with the united nations except on the issue of lifting 
-    the blockade imposed upon it since the year 1990. Ramadan told reporters in baghdad that "iraq cannot deal positively 
-    with whoever represents the security council unless there was a clear stance on the issue of lifting the blockade off 
-    of it. Baghdad had decided late last october to completely cease cooperating with the inspectors of the united nations 
-    special commision (unscom), in charge of disarming iraq's weapons, and whose work became very limited since the fifth 
-    of august, and announced it will not resume its cooperation with the commission even if it were subjected to a military 
-    operation. The russian foreign minister, igor ivanov, warned today, wednesday against using force against iraq, which 
-    will destroy, according to him, seven years of difficult diplomatic work and will complicate the regional situation in 
-    the area. Ivanov contended that carrying out air strikes against iraq, who refuses to cooperate with the united nations 
-    inspectors, "will end the tremendous work achieved by the international group during the past seven years and will 
-    complicate the situation in the region." Nevertheless, ivanov stressed that baghdad must resume working with the special 
-    commission in charge of disarming the iraqi weapons of mass destruction (unscom). The special representative of the 
-    united nations secretary-general in baghdad, prakash shah, announced today, wednesday, after meeting with the iraqi 
-    deputy prime minister tariq aziz, that iraq refuses to back down from its decision to cut off cooperation with the 
-    disarmament inspectors. British prime minister tony blair said today, sunday, that the crisis between the international 
-    community and iraq "did not end" and that britain is still ready, prepared, and able to strike iraq." In a gathering 
-    with the press held at the prime minister's office, blair contended that the crisis with iraq " will not end until iraq 
-    has absolutely and unconditionally respected its commitments" towards the united nations. A spokesman for tony blair had
-    indicated that the british prime minister gave permission to british air force tornado planes stationed to kuwait to 
-    join the aerial bombardment against iraq.'''
-
-    from samuel.test.test_document import single_test_document, test_documents
-    tn = TextNormalizer(single_test_document)
+    # from samuel.test.test_document import single_test_document, test_documents
+    # tn = TextNormalizer(single_test_document)
     # tn = NormalizerManager(single_test_document)
-    ts = TextSummarizer(tn.raw_sents, tn.sentences, 10)
-    summary, scores = ts.grasshopper()
-    summary, scores = ts.mmr("I literally have never heard the phrase “MMA gloves” and I listen to the JRE at least once a week.", scores)
+    # ts = TextSummarizer(tn.raw_sents, tn.sentences, 10)
+    # summary, scores = ts.continuous_lexrank()
+    # summary, scores = ts.mmr("I literally have never heard the phrase “MMA gloves” and I listen to the JRE at least once a week.", scores)
     # summary, scores = ts.continuous_lexrank()
     # summary, scores = ts.pointwise_divrank()
-    print(summary)
+    # print(summary)
     # print(ts.mmr("iphone",)[0])
+    pass

@@ -1,51 +1,45 @@
-import warnings
-from gensim.models import LdaModel
-from gensim.corpora import Dictionary
-import pyLDAvis.gensim
 import json
-import gensim
-warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
+import pyLDAvis.gensim
+from gensim.models import LdaModel, Phrases
+from gensim.corpora import Dictionary
+from warnings import filterwarnings
+filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
-# TODO for refactoring, make a consistent environment
-def TextTopicModeller(normalized_text, visualize=False):
-    bi_gram = gensim.models.Phrases(normalized_text)
-    normalized_text = [bi_gram[line] for line in normalized_text]
+class TextTopicModeller:
+    def __init__(self, normalized_text, visualize=False):
+        _id = id(self)
+        _name = self.__class__.__name__
 
-    dictionary = Dictionary(normalized_text)
-    dictionary_words = [dictionary.doc2bow(text) for text in normalized_text]
+        print(_name, _id, "Establishing bigrams")
+        bi_gram = Phrases(normalized_text)
+        normalized_text = [bi_gram[line] for line in normalized_text]
 
-    lda_model = LdaModel(corpus=dictionary_words, num_topics=10, id2word=dictionary)
+        print(_name, _id, "Establishing word dictionary")
+        dictionary = Dictionary(normalized_text)
+        dictionary_words = [dictionary.doc2bow(text) for text in normalized_text]
 
-    if visualize:
-        filename = 'visualization.json'
-        visualization = pyLDAvis.gensim.prepare(lda_model, dictionary_words, dictionary)
-        pyLDAvis.save_json(visualization, filename)
-        with open(filename) as json_data:
-            visual = json.load(json_data)
-            return visual
-    else:
-        return lda_model.get_topics()
+        print(_name, _id, "Constructing LDA model")
+        lda_model = LdaModel(corpus=dictionary_words, num_topics=10, id2word=dictionary)
+
+        if visualize:
+            filename = 'visualization.json'
+            visualization = pyLDAvis.gensim.prepare(lda_model, dictionary_words, dictionary)
+            pyLDAvis.save_json(visualization, filename)
+            with open(filename) as json_data:
+                visual = json.load(json_data)
+                self._topics = visual
+        else:
+            self._topics = lda_model.get_topics()
+        print(_name, _id, "Topic modelling done")
+
+    @property
+    def topics(self):
+        return self._topics
 
 
 if __name__ == "__main__":
-    text3 = "I have missed iOS a lot over the last 3 years and it feels good to be back. Super smooth and no hiccups. I " \
-            "know few people have experienced some bugs recently. I guess I was one of the lucky ones not to have any " \
-            "issues. Maybe it was already patched when I bought the phone. However, my only complaint is the fact that " \
-            "iOS still does not let you clear all notifications from a particular app at once. I really would like to see " \
-            "fixed in a future update. Customisation wise, I do not have any issues because I hardly customised my Note " \
-            "4. Only widgets I had running were weather and calendar. Even then, I would still open up the actual app to " \
-            "seek more detail. However, I still do not use iCloud. I really wish Apple would have given us more online " \
-            "storage for backup. 5GB is hardly enough these days to backup everything on your phone. One of my mates " \
-            "suggested that Apple should ship the phone with iCloud storage same as the phone. It surely would be " \
-            "awesome. But business wise, I cannot see Apple going ahead with such a decision. But in my opinion, " \
-            "iCloud users should get at least 15GB free. Coming from an Android, I thought it would make sense to keep " \
-            "using my Google account to sync contacts and photos as it would take away the hassle of setting everything " \
-            "up from scratch. Only issue is sometimes I feel like iOS restricting the background app refresh of Google " \
-            "apps such as Google photos. For example, I always have to keep Google Photos running in order to allow " \
-            "background upload, which makes no sense. Same goes for OneDrive. Overall, navigation around the OS is easy " \
-            "and convenient. "
-
+    pass
 # def __extract_keyphrase(text, n_gram=2, keywords=4):
 #
 #     def word_similarity(words1, words2):

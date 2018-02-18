@@ -1,13 +1,11 @@
-import cProfile, pstats
-from pprint import pprint
 import numpy as np
 import warnings
 from typing import Callable, Tuple, Optional, Dict, Union, Set, List
 from enum import Enum
-from samuel.old_normalizer import TextNormalizer
+from samuel.old.old_normalizer import TextNormalizer
 from textwrap import fill, indent
-
-warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
+from warnings import filterwarnings
+filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
 class TextSummarizer:
