@@ -27,7 +27,7 @@ def api(data: Dict) -> Dict[str, Any]:
         return default if param not in data else data[param]
 
     text = data['text']
-    title = data['title']
+    query = data['query']
 
     # TEXT TRANSLATOR
     # translate_from = check_param(Language.TAGALOG.value, "translate_from")
@@ -48,7 +48,7 @@ def api(data: Dict) -> Dict[str, Any]:
         token_count = len(t_normalizer.tokens)
     else:
         for partition in partitions:
-            tn = TextNormalizer(partition)
+            tn = TextNormalizer(partition, query=query)
             raw_sents.extend(tn.raw_sents)
             sentences.extend(tn.sentences)
             token_count += len(tn.tokens)
@@ -63,7 +63,6 @@ def api(data: Dict) -> Dict[str, Any]:
     # TEXT SUMMARIZER
     summary_length = data['summary_length']
     sort_by_score = check_param(False, "sort_by_score")
-    query = check_param(None, "query")
 
     options = {
         "raw_sents": raw_sents,
@@ -160,13 +159,15 @@ def exec_topic_modeller(sents: List[str], visualize: bool, style: bool) -> Dict[
                             '});' \
                             '}'
         return ((dashboard_head + dashboard_script1 + dashboard_script2) if dashboard_style
-                else (dashboard_script1 + dashboard_script2))
+        else (dashboard_script1 + dashboard_script2))
+
     dashboard = build_dashboard(TextTopicModeller(sents, visualize=visualize).topics, dashboard_style=style)
     return {"dashboard": dashboard}
 
 
 if __name__ == "__main__":
     from samuel.test.test_document import single_test_document, document3
+
     api({
         "text": single_test_document,
         "summary_length": 10,
