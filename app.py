@@ -2,13 +2,14 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
 import Samuel
+import samuel.progress as progress
 
 app = Flask(__name__)
 cors = CORS(app)
 
 
 def valid(api_key):
-    return requests.get("http://192.168.1.7/validate_key?key="+api_key).json()
+    return requests.get("http://192.168.1.7/validate_key?key=" + api_key).json()
 
 
 @app.route('/')
@@ -19,12 +20,12 @@ def get_tasks():
 @app.route('/samuel_api', methods=['POST', 'GET'])
 def samuel_api():
     if valid(request.args.get('KEY')):
-        # try:
-        samuel = Samuel.api(request.get_json())
+        ip = request.remote_addr
+        progress.reset_logs(ip)
+        data = request.get_json()
+        data['ip'] = ip
+        samuel = Samuel.api(data)
         return jsonify(samuel)
-        # except Exception as ex:
-        #     print("SYSTEM ERROR")
-        #     return "SYSTEM ERROR"
     else:
         return "Invalid API Key"
 
@@ -34,7 +35,7 @@ def samuel_init():
     return jsonify(Samuel.init(request.args.get('KEY')))
 
 
-@app.route('/samuel_validate', methods=['GET','POST'])
+@app.route('/samuel_validate', methods=['GET', 'POST'])
 def samuel_validate():
     if valid(request.args.get('KEY')):
         return "<h1>Valid API Key</h1>"
