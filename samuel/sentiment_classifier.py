@@ -4,49 +4,90 @@ from samuel.constants.vader import *
 
 
 class TextSentimentClassifier:
-    def __init__(self, text: str, tokens: List[str], neutrality_threshold: float = 0.1):
+    def __init__(self, norm_sents: List[Tuple[str, List[str]]], neutrality_threshold: float = 0.1):
         self._id = id(self)
         self._name = self.__class__.__name__
 
         print(self._name, self._id, "Setting up requirements")
-        if not isinstance(text, str):
-            text = str(text.encode('utf-8'))
-        self._text = text
         self._lexicon = VADER
-        self._tokens = tokens
 
-        is_different = False
-        allcap_words = 0
-        for word in self._tokens:
-            if word.isupper():
-                allcap_words += 1
-        cap_differential = len(self._tokens) - allcap_words
-        if 0 < cap_differential < len(self._tokens):
-            is_different = True
+        self._negative_descriptors = list()
+        self._positive_descriptors = list()
+        self._neutral_descriptors = list()
+        self._sentiment_descriptors = list()
 
-        self._is_cap_diff = is_different
+        self._neg_scores = list()
+        self._pos_scores = list()
+        self._neu_scores = list()
+        self._compounds = list()
+
         print(self._name, self._id, "Computing word valences and polarity score")
-        polarity_scores = self.__polarity_scores()
+        for sents in norm_sents:
+            text = sents[0]
+            tokens = sents[1]
+            if not isinstance(text, str):
+                text = str(text.encode('utf-8'))
+            self._text = text
+            self._tokens = tokens
 
-        if neutrality_threshold * -1 < polarity_scores["compound"] < neutrality_threshold:
-            final_sentiment = "neutral"
-        else:
-            final_sentiment = "positive" if polarity_scores["compound"] > 0 else 'negative'
+            is_different = False
+            allcap_words = 0
+            for word in self._tokens:
+                if word.isupper():
+                    allcap_words += 1
+            cap_differential = len(self._tokens) - allcap_words
+            if 0 < cap_differential < len(self._tokens):
+                is_different = True
 
-        neutral = "{0:.2f} %".format(polarity_scores["neu"] * 100)
-        positive = "{0:.2f} %".format(polarity_scores['pos'] * 100)
-        negative = "{0:.2f} %".format(polarity_scores['neg'] * 100)
+            self._is_cap_diff = is_different
+            polarity_scores = self.__polarity_scores()
 
-        print(self._name, self._id, "Sentiment classification done")
-        self._scores = {
-            "final_sentiment": final_sentiment,
-            "compound": polarity_scores["compound"],
+            neu_words = list()
+            pos_words = list()
+            neg_words = list()
+            for i, valence in enumerate(self._word_valences):
+                if valence:
+                    if valence > 0:
+                        pos_words.append(tokens[i])
+                    if valence < 0:
+                        neg_words.append(tokens[i])
+                else:
+                    neu_words.append(tokens[i])
+
+            self._positive_descriptors.append(pos_words)
+            self._negative_descriptors.append(neg_words)
+            self._neutral_descriptors.append(neu_words)
+
+            self._pos_scores.append(polarity_scores['pos'] * 100)
+            self._neg_scores.append(polarity_scores['neg'] * 100)
+            self._neu_scores.append(polarity_scores["neu"] * 100)
+            self._compounds.append(polarity_scores["compound"])
+
+            sentiment = ""
+            compound = polarity_scores["compound"]
+            if neutrality_threshold * -1 < compound < neutrality_threshold:
+                sentiment = "neutral"
+            else:
+                if compound > 0.8:
+                    sentiment = "extremely positive"
+                elif compound > 0:
+                    sentiment = "positive"
+                if compound < -0.8:
+                    sentiment = "extremely negative"
+                elif compound < 0:
+                    sentiment = "negative"
+            self._sentiment_descriptors.append(sentiment)
+
+        self._total_score = {
+            "compound": sum(self._compounds) / len(self._compounds),
             "percentage": {
-                "positive": positive,
-                "negative": negative,
-                "neutral": neutral
+                "positive": sum(self._pos_scores) / len(self._pos_scores),
+                "negative": sum(self._neg_scores) / len(self._neg_scores),
+                "neutral": sum(self._neu_scores) / len(self._neu_scores)
             }
         }
+
+        print(self._name, self._id, "Sentiment classification done")
 
     def __polarity_scores(self) -> Dict[str, float]:
         word_valences = list()
@@ -60,6 +101,7 @@ class TextSentimentClassifier:
                 continue
             word_valences.append(self.__sentiment_valence(valence, token, index))
         word_valences = self.__but_word_check(word_valences)
+        self._word_valences = word_valences
         return self.__score_valence(word_valences)
 
     def __sentiment_valence(self, valence: float, token: str, token_index: int) -> float:
@@ -275,9 +317,21 @@ class TextSentimentClassifier:
         return pos_sum, neg_sum, neu_count
 
     @property
-    def sentiment_score(self):
-        return self._scores
+    def sentiment_scores(self):
+        return list(zip(self._pos_scores, self._neg_scores, self._neu_scores, self._compounds))
+
+    @property
+    def sentiment_descriptors(self):
+        return list(zip(self._positive_descriptors, self._negative_descriptors, self._neutral_descriptors))
+
+    @property
+    def total_score(self):
+        return self._total_score
 
 
 if __name__ == "__main__":
+    from samuel.test.test_document import document3
+    from samuel.normalizer import TextNormalizer, Property
+    tn = TextNormalizer(document3, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char})
+    TextSentimentClassifier(list(zip(tn.raw_sents, tn.sentences)))
     pass

@@ -36,7 +36,8 @@ class TextNormalizer:
     def __init__(self, text: str, enable: Set[Property] = None,
                  pos_filters: Set[str] = None, punct_filters: Set[str] = None,
                  min_word_length: int = 2, norm_threshold: int = 2, spell_threshold: int = 4,
-                 query: str = None, query_similarity_threshold: float = 0.7, translate: bool = True):
+                 query: str = None, query_similarity_threshold: float = 0.7,
+                 translate: bool = True):
         self._id = id(self)
         self._name = self.__class__.__name__
 
@@ -71,14 +72,7 @@ class TextNormalizer:
             return self._sc_regex.search(token.text)
 
         def filtered_tokens(span: tokens.Span) -> str:
-            translator = TextTranslator()
             for token in span:
-                if translate and not translator.is_language(token.text, Language.ENGLISH):
-                    translated_text = translator.translate_if(token.text, Language.TAGALOG)
-                    if translated_text:
-                        token = TextNormalizer._spacy_loader(translated_text)[0]
-                    else:
-                        continue
                 base_word = token.lemma_
                 if (not base_word
                         or contain_special_char(token)
@@ -119,10 +113,20 @@ class TextNormalizer:
                 if token.dep_ == "nsubj":
                     query_subject = token.text
                     break
+
+        translator = TextTranslator()
         for sentence in document.sents:
+            if translate and not translator.is_language(unescape(sentence.text), Language.ENGLISH):
+                translated_text = translator.translate_to(unescape(sentence.text))
+                if translated_text:
+                    sentence = list(TextNormalizer._spacy_loader(unescape(translated_text)).sents)[0]
+                else:
+                    continue
+
             if query and query.similarity(sentence) < query_similarity_threshold:
                 print(query.similarity(sentence))
                 continue
+
             accepted_tokens = list(filtered_tokens(sentence))
             if accepted_tokens and len(accepted_tokens) > norm_threshold:
                 self._raw_sents.append(" ".join(sentence.text.split()))
@@ -261,8 +265,8 @@ class NormalizerManager:
 
 
 if __name__ == "__main__":
-    from samuel.test.test_document import single_test_document, document1
-    print(TextNormalizer("Sentence that is panget.", norm_threshold=0))
+    from samuel.test.test_document import single_test_document, document1, document3
+    print(TextNormalizer("This is sentence is so pangit", norm_threshold=0))
     # cProfile.run("TextNormalizer(document, enable={Property.Spelling})", "Text_Normalizer")
     # tn_profiler = pstats.Stats("Text_Normalizer")
     # tn_profiler.strip_dirs().sort_stats("cumulative").print_stats(10)

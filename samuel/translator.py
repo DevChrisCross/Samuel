@@ -18,14 +18,15 @@ class TextTranslator:
 
     def is_language(self, text: str, lang: Language) -> bool:
         detection_rate = self._translator.detect(text)
-        return detection_rate.lang == lang.value
+        return detection_rate.lang == lang.value and detection_rate.confidence == 1
 
     def translate_to(self, text: str,
                      _from: Language = Language.TAGALOG,
                      _to: Language = Language.ENGLISH) -> str:
         return self._translator.translate(text, src=_from.value, dest=_to.value).text
 
-    def translate_if(self, text: str, lang: Language, _to: Language = Language.ENGLISH) -> Optional:
+    def translate_if(self, text: str,
+                     lang: Language, _to: Language = Language.ENGLISH) -> Optional:
         if self.is_language(text, lang):
             return self.translate_to(text, _from=lang, _to=_to)
         else:
@@ -67,7 +68,7 @@ class TranslatorManager:
 
 
 if __name__ == "__main__":
-    translate_if("panget", Language.TAGALOG)
+    TextTranslator().is_language("This sentence is written in English", Language.TAGALOG)
     # from samuel.test.test_document import single_test_document
     # print(TranslatorManager(single_test_document).translated_text)
     pass
