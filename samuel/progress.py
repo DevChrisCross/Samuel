@@ -54,9 +54,6 @@ def return_progress():
         return str(0)
 
 
-# if __name__ == '__main__':
-#     app.run(host='0.0.0.0', port=63343, debug=True)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=63343, debug=True)
 
-reset_logs("192.168.1.5")
-#
-# print(return_progress())
