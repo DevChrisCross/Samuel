@@ -1,6 +1,11 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import json
+import pyLDAvis.gensim
+from gensim.models import LdaModel, Phrases
+from gensim.corpora import Dictionary
+from warnings import filterwarnings
+filterwarnings(action='ignore', category=UserWarning, module='gensim')
 from datetime import datetime
 
 app = Flask(__name__)
@@ -41,18 +46,20 @@ def reset_logs(ip: str):
         }
         with open(filename, 'w') as progress:
             json.dump(update_logs, progress)
-    except:
+    except Exception:
         pass
 
 
 @app.route('/')
 def return_progress():
     try:
-        filename = "update_log.json"
+        filename = "../update_log.json"
         with open(filename) as progress:
             update_logs = json.load(progress)
-        return str(update_logs[request.remote_addr]['update']['percentage'])
-    except:
+        # return str(1)
+        logs = update_logs[request.remote_addr]['update']
+        return str(logs['percentage'])
+    except Exception:
         return str(0)
 
 

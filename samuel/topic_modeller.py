@@ -21,7 +21,7 @@ class TextTopicModeller:
         dictionary_words = [dictionary.doc2bow(text) for text in normalized_text]
 
         print(_name, _id, "Constructing LDA model")
-        lda_model = LdaModel(corpus=dictionary_words, num_topics=_length, id2word=dictionary)
+        lda_model = LdaModel(corpus=dictionary_words, num_topics=10, id2word=dictionary)
 
         if visualize:
             filename = 'visualization.json'

@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
 import Samuel
-import samuel.progress as progress
+import progress as progress
 
 app = Flask(__name__)
 cors = CORS(app)

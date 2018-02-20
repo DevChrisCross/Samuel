@@ -1,11 +1,11 @@
 from samuel.normalizer import TextNormalizer, Property, NormalizerManager
-from samuel.translator import TranslatorManager, Language
+from samuel.translator import Language
 from samuel.summarizer import TextSummarizer
 from samuel.topic_modeller import TextTopicModeller
 from samuel.sentiment_classifier import TextSentimentClassifier
+from progress import update_progress
 from functools import partial
 from numpy import round
-from warnings import filterwarnings
 from time import time
 from enum import Enum
 from typing import Type, Dict, Any, List
@@ -27,7 +27,8 @@ def api(data: Dict) -> Dict[str, Any]:
         return default if param not in data else data[param]
 
     text = data['text']
-    query = data['query']
+    ip = data["ip"]
+    query = check_param(None, "query")
 
     # TEXT TRANSLATOR
     # translate_from = check_param(Language.TAGALOG.value, "translate_from")
@@ -47,7 +48,8 @@ def api(data: Dict) -> Dict[str, Any]:
         sentences = t_normalizer.sentences
         token_count = len(t_normalizer.tokens)
     else:
-        for partition in partitions:
+        for i, partition in enumerate(partitions):
+            update_progress(ip, 30 / len(partitions) - i)
             tn = TextNormalizer(partition, query=query)
             raw_sents.extend(tn.raw_sents)
             sentences.extend(tn.sentences)
@@ -73,21 +75,22 @@ def api(data: Dict) -> Dict[str, Any]:
         "query": query,
         "style": dashboard_style,
         "partitions": partitions,
-        "neu_threshold": neu_threshold
+        "neu_threshold": neu_threshold,
+        "ip": ip
     }
 
     samuel_data = dict()
     print("Preparing API Process Pool")
+    update_progress(ip, round(30+(40/4.5), 2))
     pool = Pool()
+    update_progress(ip, round(30 + (40 / 2.5), 2))
     print("Mapping API Processes")
     result = pool.map_async(partial(api_processor, options=options), list(range(3)))
+    if len(result.get()) == 1:
+        print("print something")
     for data in result.get():
         samuel_data.update(data)
     end_time = time()
-    samuel_data.update({"total_score": samuel_data["sc"].total_score,
-                        "score": samuel_data["sc"].sentiment_scores,
-                        "descriptors": samuel_data["sc"].sentiment_descriptors})
-    samuel_data.pop("sc")
     print("API Pooling Done")
     print("Data processed in", round(end_time - start_time, 2), "secs. with over",
           len(raw_sents), "sentences consisted of",
@@ -97,7 +100,7 @@ def api(data: Dict) -> Dict[str, Any]:
 
 def api_processor(func_id: int, options: Dict[str, Any]) -> Dict[str, Any]:
     if func_id == 0:
-        return exec_sentiment_classifier(options["partitions"], options["neu_threshold"])
+        return exec_sentiment_classifier(options["query"], options["partitions"], options["neu_threshold"])
     if func_id == 1:
         return exec_topic_modeller(options["sents"], options["visualize"], options["style"])
     if func_id == 2:
@@ -105,26 +108,30 @@ def api_processor(func_id: int, options: Dict[str, Any]) -> Dict[str, Any]:
                                options["query"])
 
 
-def exec_sentiment_classifier(partitions: List[str], neu_threshold: float) -> Dict[str, Any]:
-    sentences = list()
-    raw_sents = list()
+def exec_sentiment_classifier(query: str, partitions: List[str], neu_threshold: float) -> Dict[str, Any]:
+    _sentences = list()
+    _raw_sents = list()
     for partition in partitions:
-        tn = TextNormalizer(partition, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char})
-        sentences.extend(tn.sentences)
-        raw_sents.extend(tn.raw_sents)
-    sents = list(zip(raw_sents, sentences))
+        tn = TextNormalizer(partition, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char}, query=query)
+        _sentences.extend(tn.sentences)
+        _raw_sents.extend(tn.raw_sents)
+    sents = list(zip(_raw_sents, _sentences))
     sentiment_classifier = TextSentimentClassifier(sents, neutrality_threshold=neu_threshold)
-    return {"sc": sentiment_classifier}
+    return {"total_score": sentiment_classifier.total_score,
+            "score": sentiment_classifier.sentiment_scores,
+            "descriptors": sentiment_classifier.sentiment_descriptors}
 
 
 def exec_summarizer(raw_sents, sents, summary_length: int, sort_by_score: bool, query: str) -> Dict[str, Any]:
     summarizer = TextSummarizer(raw_sents, sents, summary_length=summary_length, sort_by_score=sort_by_score)
     summary, scores = summarizer.continuous_lexrank()
-    if query:
-        try:
-            summary, scores = summarizer.mmr(query, scores)
-        except ValueError as ve:
-            pass
+    # module disabled: the normalizer is already filtered by the query; thus, the mmr can no longer tolerate
+    #     the filtering method use of query
+    # if query:
+    #     try:
+    #         summary, scores = summarizer.mmr(query, scores)
+    #     except ValueError as ve:
+    #         pass
     return {"summarized_text": summary}
 
 
@@ -168,12 +175,12 @@ def exec_topic_modeller(sents: List[str], visualize: bool, style: bool) -> Dict[
 
 
 if __name__ == "__main__":
-    from samuel.test.test_document import single_test_document, document3
+    from samuel.test.test_document import document3
 
     api({
-        "text": single_test_document,
+        "text": document3,
         "summary_length": 10,
         "visualize": True,
-        "query": "I see Joe Ragan commenting on me."
+        # "query": "iPhone 8 Plus got the best battery life"
     })
     pass

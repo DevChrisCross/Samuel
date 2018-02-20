@@ -26,7 +26,7 @@ class Property(Enum):
 
 
 class TextNormalizer:
-    _spacy_loader = load("en")
+    _spacy_loader = load("en_core_web_lg")
     _enchant_dict = enchant.Dict("en_US")
     _repeat_regex = re.compile(pattern=r"(\w*)(\w)\2(\w*)")
     _stop_words = stopwords.words("english")
@@ -36,7 +36,7 @@ class TextNormalizer:
     def __init__(self, text: str, enable: Set[Property] = None,
                  pos_filters: Set[str] = None, punct_filters: Set[str] = None,
                  min_word_length: int = 2, norm_threshold: int = 2, spell_threshold: int = 4,
-                 query: str = None, query_similarity_threshold: float = 0.7,
+                 query: str = None, query_similarity_threshold: float = 0.5,
                  translate: bool = True):
         self._id = id(self)
         self._name = self.__class__.__name__
@@ -124,7 +124,6 @@ class TextNormalizer:
                     continue
 
             if query and query.similarity(sentence) < query_similarity_threshold:
-                print(query.similarity(sentence))
                 continue
 
             accepted_tokens = list(filtered_tokens(sentence))
