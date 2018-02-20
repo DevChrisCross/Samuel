@@ -25,6 +25,7 @@ def samuel_api():
         data = request.get_json()
         data['ip'] = ip
         samuel = Samuel.api(data)
+        progress.reset_logs(ip)
         return jsonify(samuel)
     else:
         return "Invalid API Key"

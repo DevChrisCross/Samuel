@@ -6,7 +6,7 @@ from samuel.sentiment_classifier import TextSentimentClassifier
 from progress import update_progress
 from functools import partial
 from numpy import round
-from time import time
+from time import time, sleep
 from enum import Enum
 from typing import Type, Dict, Any, List
 from multiprocessing import Pool
@@ -49,7 +49,8 @@ def api(data: Dict) -> Dict[str, Any]:
         token_count = len(t_normalizer.tokens)
     else:
         for i, partition in enumerate(partitions):
-            update_progress(ip, 30 / len(partitions) - i)
+            sleep(1)
+            update_progress(ip, round(30 / (len(partitions) - i), 2))
             tn = TextNormalizer(partition, query=query)
             raw_sents.extend(tn.raw_sents)
             sentences.extend(tn.sentences)
@@ -81,16 +82,19 @@ def api(data: Dict) -> Dict[str, Any]:
 
     samuel_data = dict()
     print("Preparing API Process Pool")
-    update_progress(ip, round(30+(40/4.5), 2))
+    update_progress(ip, round(30+(30/4), 2))
     pool = Pool()
-    update_progress(ip, round(30 + (40 / 2.5), 2))
+    update_progress(ip, round(30 + (30 / 2), 2))
     print("Mapping API Processes")
     result = pool.map_async(partial(api_processor, options=options), list(range(3)))
-    if len(result.get()) == 1:
-        print("print something")
     for data in result.get():
         samuel_data.update(data)
+    for i in range(10):
+        update_progress(ip, round(45 + (50 / (10-i)), 2))
+        sleep(0.25)
     end_time = time()
+    update_progress(ip, 100)
+    sleep(0.5)
     print("API Pooling Done")
     print("Data processed in", round(end_time - start_time, 2), "secs. with over",
           len(raw_sents), "sentences consisted of",

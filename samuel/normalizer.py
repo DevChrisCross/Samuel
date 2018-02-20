@@ -26,7 +26,7 @@ class Property(Enum):
 
 
 class TextNormalizer:
-    _spacy_loader = load("en_core_web_lg")
+    _spacy_loader = load("en")
     _enchant_dict = enchant.Dict("en_US")
     _repeat_regex = re.compile(pattern=r"(\w*)(\w)\2(\w*)")
     _stop_words = stopwords.words("english")
