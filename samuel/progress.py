@@ -15,16 +15,16 @@ def update_progress(ip: str, percentage: float):
 
     if ip not in logs:
         logs[ip] = {
-            'logs': [{
+            'update': {
                 'datetime': now,
                 'percentage': percentage
-            }]
+            }
         }
     else:
-        logs[ip]["logs"].append({
+        logs[ip]["update"] = {
             'datetime': now,
             'percentage': percentage
-        })
+        }
 
     with open(filename, 'w') as progress:
         json.dump(logs, progress)
@@ -35,7 +35,10 @@ def reset_logs(ip: str):
         filename = "update_log.json"
         with open(filename) as progress:
             update_logs = json.load(progress)
-        update_logs[ip]['logs'] = []
+        update_logs[ip]['update'] = {
+            'datetime': "",
+            'percentage': 0
+        }
         with open(filename, 'w') as progress:
             json.dump(update_logs, progress)
     except:
@@ -48,8 +51,7 @@ def return_progress():
         filename = "update_log.json"
         with open(filename) as progress:
             update_logs = json.load(progress)
-        logs = update_logs[request.remote_addr]['logs']
-        return str(logs[len(logs) - 1]['percentage'])
+        return str(update_logs[request.remote_addr]['update']['percentage'])
     except:
         return str(0)
 
