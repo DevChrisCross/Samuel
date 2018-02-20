@@ -84,8 +84,9 @@ def api(data: Dict) -> Dict[str, Any]:
     for data in result.get():
         samuel_data.update(data)
     end_time = time()
-    samuel_data.update({"polarity": samuel_data["sc"]["final_sentiment"],
-                        "percentage": samuel_data["sc"]["percentage"]})
+    samuel_data.update({"total_score": samuel_data["sc"].total_score,
+                        "score": samuel_data["sc"].sentiment_scores,
+                        "descriptors": samuel_data["sc"].sentiment_descriptors})
     samuel_data.pop("sc")
     print("API Pooling Done")
     print("Data processed in", round(end_time - start_time, 2), "secs. with over",
@@ -105,13 +106,14 @@ def api_processor(func_id: int, options: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def exec_sentiment_classifier(partitions: List[str], neu_threshold: float) -> Dict[str, Any]:
-    tokens = list()
+    sentences = list()
+    raw_sents = list()
     for partition in partitions:
-        tokens.extend(
-            TextNormalizer(partition, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char}).tokens
-        )
-    sentiment_classifier = TextSentimentClassifier(" ".join(partitions), tokens,
-                                                   neutrality_threshold=neu_threshold).sentiment_score
+        tn = TextNormalizer(partition, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char})
+        sentences.extend(tn.sentences)
+        raw_sents.extend(tn.raw_sents)
+    sents = list(zip(raw_sents, sentences))
+    sentiment_classifier = TextSentimentClassifier(sents, neutrality_threshold=neu_threshold)
     return {"sc": sentiment_classifier}
 
 

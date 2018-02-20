@@ -318,11 +318,19 @@ class TextSentimentClassifier:
 
     @property
     def sentiment_scores(self):
-        return list(zip(self._pos_scores, self._neg_scores, self._neu_scores, self._compounds))
+        scores = list(zip(self._pos_scores, self._neg_scores, self._neu_scores, self._compounds))
+        score_list = list()
+        for score in scores:
+            score_list.append(dict(zip(["pos", "neg", "neu"], score)))
+        return score_list
 
     @property
     def sentiment_descriptors(self):
-        return list(zip(self._positive_descriptors, self._negative_descriptors, self._neutral_descriptors))
+        descriptors = list(zip(self._positive_descriptors, self._negative_descriptors, self._neutral_descriptors))
+        desc_list = list()
+        for descriptor in descriptors:
+            desc_list.append(dict(zip(["pos", "neg", "neu"], descriptor)))
+        return desc_list
 
     @property
     def total_score(self):
@@ -333,5 +341,5 @@ if __name__ == "__main__":
     from samuel.test.test_document import document3
     from samuel.normalizer import TextNormalizer, Property
     tn = TextNormalizer(document3, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char})
-    TextSentimentClassifier(list(zip(tn.raw_sents, tn.sentences)))
+    print(TextSentimentClassifier(list(zip(tn.raw_sents, tn.sentences))).sentiment_descriptors)
     pass
