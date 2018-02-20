@@ -27,6 +27,7 @@ def api(data: Dict) -> Dict[str, Any]:
         return default if param not in data else data[param]
 
     text = data['text']
+    title = data['title']
 
     # TEXT TRANSLATOR
     # translate_from = check_param(Language.TAGALOG.value, "translate_from")
