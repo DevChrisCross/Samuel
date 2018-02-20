@@ -8,7 +8,7 @@ cors = CORS(app)
 
 
 def valid(api_key):
-    return requests.get("http://192.168.43.18/validate_key?key="+api_key).json()
+    return requests.get("http://192.168.1.14/validate_key?key="+api_key).json()
 
 
 @app.route('/')

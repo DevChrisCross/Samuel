@@ -1,11 +1,8 @@
 from googletrans import Translator
 from enum import Enum
 from functools import partial
+from typing import Union, List, Optional
 import multiprocessing as mp
-
-__translator = Translator(service_urls=[
-    'translate.google.com',
-])
 
 
 class Language(Enum):
@@ -13,8 +10,26 @@ class Language(Enum):
     ENGLISH = "en"
 
 
-def translate(text: str, translate_from=Language.TAGALOG.value, translate_to=Language.ENGLISH.value):
-    return __translator.translate(text=text, dest=translate_to, src=translate_from).text
+class TextTranslator:
+    def __init__(self):
+        self._translator = Translator(service_urls=[
+            'translate.google.com',
+        ])
+
+    def is_language(self, text: str, lang: Language) -> bool:
+        detection_rate = self._translator.detect(text)
+        return detection_rate.lang == lang.value
+
+    def translate_to(self, text: str,
+                     _from: Language = Language.TAGALOG,
+                     _to: Language = Language.ENGLISH) -> str:
+        return self._translator.translate(text, src=_from.value, dest=_to.value).text
+
+    def translate_if(self, text: str, lang: Language, _to: Language = Language.ENGLISH) -> Optional:
+        if self.is_language(text, lang):
+            return self.translate_to(text, _from=lang, _to=_to)
+        else:
+            return None
 
 
 class TranslatorManager:
@@ -52,6 +67,7 @@ class TranslatorManager:
 
 
 if __name__ == "__main__":
+    translate_if("panget", Language.TAGALOG)
     # from samuel.test.test_document import single_test_document
     # print(TranslatorManager(single_test_document).translated_text)
     pass

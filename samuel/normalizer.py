@@ -14,6 +14,7 @@ from spacy import load, tokens
 from samuel.constants.taggers import *
 from html import unescape
 from nltk.corpus import wordnet
+from samuel.translator import TextTranslator, Language
 filterwarnings(action='ignore', category=UserWarning, module='gensim')
 
 
@@ -34,7 +35,8 @@ class TextNormalizer:
 
     def __init__(self, text: str, enable: Set[Property] = None,
                  pos_filters: Set[str] = None, punct_filters: Set[str] = None,
-                 min_word_length: int = 2, norm_threshold: int = 2, spell_threshold: int = 4):
+                 min_word_length: int = 2, norm_threshold: int = 2, spell_threshold: int = 4,
+                 query: str = None, query_similarity_threshold: float = 0.7, translate: bool = True):
         self._id = id(self)
         self._name = self.__class__.__name__
 
@@ -69,7 +71,14 @@ class TextNormalizer:
             return self._sc_regex.search(token.text)
 
         def filtered_tokens(span: tokens.Span) -> str:
+            translator = TextTranslator()
             for token in span:
+                if translate and not translator.is_language(token.text, Language.ENGLISH):
+                    translated_text = translator.translate_if(token.text, Language.TAGALOG)
+                    if translated_text:
+                        token = TextNormalizer._spacy_loader(translated_text)[0]
+                    else:
+                        continue
                 base_word = token.lemma_
                 if (not base_word
                         or contain_special_char(token)
@@ -103,7 +112,17 @@ class TextNormalizer:
                 yield base_word
 
         print(self._name, self._id, "Filtering tokens and sentences")
+        if query:
+            # TODO: word network
+            query = TextNormalizer._spacy_loader(unescape(query))
+            for token in query:
+                if token.dep_ == "nsubj":
+                    query_subject = token.text
+                    break
         for sentence in document.sents:
+            if query and query.similarity(sentence) < query_similarity_threshold:
+                print(query.similarity(sentence))
+                continue
             accepted_tokens = list(filtered_tokens(sentence))
             if accepted_tokens and len(accepted_tokens) > norm_threshold:
                 self._raw_sents.append(" ".join(sentence.text.split()))
@@ -166,7 +185,10 @@ class TextNormalizer:
 class NormalizerManager:
     def __init__(self, documents: Union[List[str], str], enable: Set[Property] = None,
                  pos_filters: Set[str] = None, punct_filters: Set[str] = None,
-                 min_word_length: int = 1, batch_size: int = 200):
+                 min_word_length: int = 1, batch_size: int = 200,
+                 norm_threshold: int = 2, spell_threshold: int = 4,
+                 query: str = None, query_similarity_threshold: float = 0.7
+                 ):
         self._id = id(self)
         self._name = self.__class__.__name__
 
@@ -177,12 +199,16 @@ class NormalizerManager:
         if isinstance(documents, str):
             print(self._name, self._id, "Preparing document batches")
             self._partitions = NormalizerManager.partitioned_docs(documents, batch_size)
+            documents = self._partitions
 
+        print(len(self._partitions))
         print(self._name, self._id, "Preparing process pool")
         pool = mp.Pool()
         print(self._name, self._id, "Mapping document batches")
         result = pool.map_async(partial(TextNormalizer, enable=enable, pos_filters=pos_filters,
-                                punct_filters=punct_filters, min_word_length=min_word_length), documents)
+                                        punct_filters=punct_filters, min_word_length=min_word_length,
+                                        norm_threshold=norm_threshold, query=query,
+                                        query_similarity_threshold=query_similarity_threshold), documents)
         for tn in result.get():
             self._raw_sents.extend(tn.raw_sents)
             self._sentences.extend(tn.sentences)
@@ -235,8 +261,8 @@ class NormalizerManager:
 
 
 if __name__ == "__main__":
-    # from samuel.test.test_document import single_test_document
-    # print(NormalizerManager(single_test_document))
+    from samuel.test.test_document import single_test_document, document1
+    print(TextNormalizer("Sentence that is panget.", norm_threshold=0))
     # cProfile.run("TextNormalizer(document, enable={Property.Spelling})", "Text_Normalizer")
     # tn_profiler = pstats.Stats("Text_Normalizer")
     # tn_profiler.strip_dirs().sort_stats("cumulative").print_stats(10)
