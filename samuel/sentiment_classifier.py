@@ -255,13 +255,14 @@ class TextSentimentClassifier:
         if (token_index > 1
                 and self._tokens[token_index - 1].lower() not in self._lexicon
                 and self._tokens[token_index - 1].lower() == "least"):
-            if (self._tokens[token_index - 2].lower() != "at"
-                    and self._tokens[token_index - 2].lower() != "very"):
+            if self._tokens[token_index - 2].lower() != "at" and self._tokens[token_index - 2].lower() != "very":
+                self._word_descriptor.append("least")
                 valence *= NEGATION_SCALAR
 
         elif (token_index > 0
               and self._tokens[token_index - 1].lower() not in self._lexicon
               and self._tokens[token_index - 1].lower() == "least"):
+            self._word_descriptor.append("least")
             valence *= NEGATION_SCALAR
 
         return valence

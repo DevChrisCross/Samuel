@@ -1271,3 +1271,30 @@ VADER = {
     '|-o': -1.2, '|:': -0.5, '|;-)': 2.2, '|=': -0.4, '|^:': -1.1, '|o:': -0.9, '||-:': -2.3, '}:': -2.1, '}:(': -2.0,
     '}:)': 0.4, '}:-(': -2.1, '}:-)': 0.3
 }
+
+from nltk.corpus import wordnet as wn
+print(len(VADER))
+_vader_words = list(VADER.keys())
+_collected_words = dict()
+
+print("Collecting and processing synsets")
+for i, synset in enumerate(wn.all_synsets()):
+    is_word_existent = False
+    v_word = ""
+    word = synset.name().split(".")[0]
+
+    print("Filtering", word, "synsets to Vader:  word#", i+1)
+    synonyms = {subsynset.name().split(".")[0].replace("_", " ") for subsynset in wn.synsets(word)}
+    synonyms.add(word)
+
+    for word in synonyms:
+        if word in _vader_words:
+            is_word_existent = True
+            v_word = word
+            break
+
+    if is_word_existent:
+        for word in synonyms:
+            _collected_words.update({word: VADER[v_word]})
+
+VADER.update(_collected_words)
