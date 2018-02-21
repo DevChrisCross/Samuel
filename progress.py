@@ -53,7 +53,7 @@ def reset_logs(ip: str):
 @app.route('/')
 def return_progress():
     try:
-        filename = "../update_log.json"
+        filename = "update_log.json"
         with open(filename) as progress:
             update_logs = json.load(progress)
         # return str(1)

@@ -10,6 +10,9 @@ from time import time, sleep
 from enum import Enum
 from typing import Type, Dict, Any, List
 from multiprocessing import Pool
+import functools
+import traceback
+import sys
 
 
 def init(key: str) -> Dict[str, Any]:
@@ -101,7 +104,25 @@ def api(data: Dict) -> Dict[str, Any]:
           token_count, "tokens (excluding sentences and tokens below normalization threshold)")
     return samuel_data
 
+def get_traceback(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as ex:
+            ret = '#' * 60
+            ret += "\nException caught:"
+            ret += "\n"+'-'*60
+            ret += "\n" + traceback.format_exc()
+            ret += "\n" + '-' * 60
+            ret += "\n"+ "#" * 60
+            print(sys.stderr, ret)
+            sys.stderr.flush()
+            raise ex
+ 
+    return wrapper
 
+@get_traceback
 def api_processor(func_id: int, options: Dict[str, Any]) -> Dict[str, Any]:
     if func_id == 0:
         return exec_sentiment_classifier(options["query"], options["partitions"], options["neu_threshold"])
