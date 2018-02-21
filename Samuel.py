@@ -3,7 +3,6 @@ from samuel.translator import Language
 from samuel.summarizer import TextSummarizer
 from samuel.topic_modeller import TextTopicModeller
 from samuel.sentiment_classifier import TextSentimentClassifier
-from samuel.constants.vader import Vader
 from progress import update_progress
 from functools import partial
 from numpy import round
@@ -105,6 +104,7 @@ def api(data: Dict) -> Dict[str, Any]:
           token_count, "tokens (excluding sentences and tokens below normalization threshold)")
     return samuel_data
 
+
 def get_traceback(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -122,6 +122,7 @@ def get_traceback(f):
             raise ex
  
     return wrapper
+
 
 @get_traceback
 def api_processor(func_id: int, options: Dict[str, Any]) -> Dict[str, Any]:
@@ -142,8 +143,7 @@ def exec_sentiment_classifier(query: str, partitions: List[str], neu_threshold: 
         _sentences.extend(tn.sentences)
         _raw_sents.extend(tn.raw_sents)
     sents = list(zip(_raw_sents, _sentences))
-    vader = Vader().lexicon
-    sentiment_classifier = TextSentimentClassifier(sents, neutrality_threshold=neu_threshold, vader=vader)
+    sentiment_classifier = TextSentimentClassifier(sents, neutrality_threshold=neu_threshold)
     return {"total_score": sentiment_classifier.total_score,
             "score": sentiment_classifier.sentiment_scores,
             "descriptors": sentiment_classifier.sentiment_descriptors}

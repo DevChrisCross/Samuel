@@ -1,17 +1,15 @@
 import math
 from typing import Dict, List, Tuple
-from samuel.constants.vader import (BOOSTER_DECREMENT, CAPITAL_INCREMENT, NEGATION_SCALAR,
-                                    NEGATE, BOOSTER_DICT, SPECIAL_CASE_IDIOMS)
+from samuel.constants.vader import *
 
 
 class TextSentimentClassifier:
-    def __init__(self, norm_sents: List[Tuple[str, List[str]]], vader: Dict[str, float],
-                 neutrality_threshold: float = 0.1):
+    def __init__(self, norm_sents: List[Tuple[str, List[str]]], neutrality_threshold: float = 0.1):
         self._id = id(self)
         self._name = self.__class__.__name__
 
         print(self._name, self._id, "Setting up requirements")
-        self._lexicon = vader
+        self._lexicon = VADER
 
         self._negative_descriptors = list()
         self._positive_descriptors = list()
