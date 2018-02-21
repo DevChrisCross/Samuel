@@ -40,23 +40,23 @@ class TextSentimentClassifier:
                 is_different = True
 
             self._is_cap_diff = is_different
+            self._neu_words = list()
+            self._pos_words = list()
+            self._neg_words = list()
             polarity_scores = self.__polarity_scores()
 
-            neu_words = list()
-            pos_words = list()
-            neg_words = list()
-            for i, valence in enumerate(self._word_valences):
-                if valence:
-                    if valence > 0:
-                        pos_words.append(tokens[i])
-                    if valence < 0:
-                        neg_words.append(tokens[i])
-                else:
-                    neu_words.append(tokens[i])
+            # for i, valence in enumerate(self._word_valences):
+            #     if valence:
+            #         if valence > 0:
+            #             pos_words.append(tokens[i])
+            #         if valence < 0:
+            #             neg_words.append(tokens[i])
+            #     else:
+            #         neu_words.append(tokens[i])
 
-            self._positive_descriptors.append(pos_words)
-            self._negative_descriptors.append(neg_words)
-            self._neutral_descriptors.append(neu_words)
+            self._positive_descriptors.append(self._pos_words)
+            self._negative_descriptors.append(self._neg_words)
+            self._neutral_descriptors.append(self._neu_words)
 
             self._pos_scores.append(polarity_scores['pos'] * 100)
             self._neg_scores.append(polarity_scores['neg'] * 100)
@@ -93,13 +93,27 @@ class TextSentimentClassifier:
         word_valences = list()
         for index, token in enumerate(self._tokens):
             valence = 0
+            self._word_descriptor = list()
+
             if ((index < len(self._tokens) - 1
                  and self._tokens[index].lower() == "kind"
                  and self._tokens[index + 1].lower() == "of")
                     or token.lower() in BOOSTER_DICT):
                 word_valences.append(valence)
                 continue
-            word_valences.append(self.__sentiment_valence(valence, token, index))
+
+            valence = self.__sentiment_valence(valence, token, index)
+            self._word_descriptor.append(token)
+            if valence:
+                if valence > 0:
+                    self._pos_words.append(" ".join(self._word_descriptor))
+                if valence < 0:
+                    self._neg_words.append(" ".join(self._word_descriptor))
+            else:
+                self._neu_words.append(" ".join(self._word_descriptor))
+
+            word_valences.append(valence)
+
         word_valences = self.__but_word_check(word_valences)
         self._word_valences = word_valences
         return self.__score_valence(word_valences)
@@ -115,6 +129,7 @@ class TextSentimentClassifier:
                 _scalar = 0.0
                 word_lower = word.lower()
                 if word_lower in BOOSTER_DICT:
+                    self._word_descriptor.append(word_lower)
                     _scalar = BOOSTER_DICT[word_lower]
                     _scalar *= (-1 if current_valence < 0 else 1)
                     if word.isupper() and self._is_cap_diff:
@@ -159,24 +174,37 @@ class TextSentimentClassifier:
         preceding_word = self._tokens[token_index - (word_distance + immediate_distance)]
         if word_distance == 0:
             if is_word_negated([preceding_word]):
+                self._word_descriptor.append(preceding_word)
                 valence *= NEGATION_SCALAR
 
         if word_distance == 1:
-            if (self._tokens[token_index - 2] == "never"
-                    and (self._tokens[token_index - 1] == "so"
-                         or self._tokens[token_index - 1] == "this")):
-                valence *= 1.5
+            if self._tokens[token_index - 2] == "never":
+                if self._tokens[token_index - 1] == "so":
+                    self._word_descriptor.append("never so")
+                    valence *= 1.5
+                if self._tokens[token_index - 1] == "this":
+                    self._word_descriptor.append("never this")
+                    valence *= 1.5
             elif is_word_negated([preceding_word]):
+                self._word_descriptor.append(preceding_word)
                 valence *= NEGATION_SCALAR
 
         if word_distance == 2:
-            if (self._tokens[token_index - 3] == "never"
-                    and (self._tokens[token_index - 2] == "so"
-                         or self._tokens[token_index - 2] == "this")
-                    or (self._tokens[token_index - 1] == "so"
-                        or self._tokens[token_index - 1] == "this")):
+            if self._tokens[token_index - 3] == "never":
+                if self._tokens[token_index - 2] == "so":
+                    self._word_descriptor.append("never so")
+                    valence *= 1.25
+                if self._tokens[token_index - 2] == "this":
+                    self._word_descriptor.append("never this")
+                    valence *= 1.25
+            if self._tokens[token_index - 1] == "so":
+                self._word_descriptor.append("so")
                 valence *= 1.25
-            elif is_word_negated([preceding_word]):
+            if self._tokens[token_index - 1] == "this":
+                self._word_descriptor.append("this")
+                valence *= 1.25
+            if is_word_negated([preceding_word]):
+                self._word_descriptor.append(preceding_word)
                 valence *= NEGATION_SCALAR
 
         return valence
@@ -203,15 +231,21 @@ class TextSentimentClassifier:
         if len(self._tokens) - 1 > token_index:
             phrase = f"{current_word} {self._tokens[token_index + 1]}"
             if phrase in SPECIAL_CASE_IDIOMS:
+                self._word_descriptor.append(phrase)
                 valence = SPECIAL_CASE_IDIOMS[phrase]
 
         if len(self._tokens) - 1 > token_index + 1:
             phrase = f"{current_word} {self._tokens[token_index + 1]} {self._tokens[token_index + 2]}"
             if phrase in SPECIAL_CASE_IDIOMS:
+                self._word_descriptor.append(phrase)
                 valence = SPECIAL_CASE_IDIOMS[phrase]
 
         # check for booster/dampener bi-grams such as 'sort of' or 'kind of'
-        if phrase_sequences[4] in BOOSTER_DICT or phrase_sequences[2] in BOOSTER_DICT:
+        if phrase_sequences[4] in BOOSTER_DICT:
+            self._word_descriptor.append(phrase_sequences[4])
+            valence += BOOSTER_DECREMENT
+        if phrase_sequences[2] in BOOSTER_DICT:
+            self._word_descriptor.append(phrase_sequences[2])
             valence += BOOSTER_DECREMENT
 
         return valence
@@ -341,5 +375,7 @@ if __name__ == "__main__":
     from samuel.test.test_document import document3
     from samuel.normalizer import TextNormalizer, Property
     tn = TextNormalizer(document3, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char})
-    print(TextSentimentClassifier(list(zip(tn.raw_sents, tn.sentences))).sentiment_descriptors)
+    dummy = TextSentimentClassifier(list(zip(tn.raw_sents, tn.sentences))).sentiment_descriptors
+    for d in dummy:
+        print(d)
     pass
