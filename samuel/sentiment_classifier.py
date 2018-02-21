@@ -9,7 +9,7 @@ class TextSentimentClassifier:
         self._name = self.__class__.__name__
 
         print(self._name, self._id, "Setting up requirements")
-        self._lexicon = VADER
+        self._lexicon = EXTENDED_VADER
 
         self._negative_descriptors = list()
         self._positive_descriptors = list()
