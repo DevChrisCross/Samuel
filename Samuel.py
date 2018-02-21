@@ -32,7 +32,7 @@ def api(data: Dict) -> Dict[str, Any]:
     text = data['text']
     ip = data["ip"]
     query = check_param(None, "query")
-
+    q_threshold = check_param(0.5, "query_threshold")
     # TEXT TRANSLATOR
     # translate_from = check_param(Language.TAGALOG.value, "translate_from")
     # translate_to = check_param(Language.ENGLISH.value, "translate_to")
@@ -54,7 +54,7 @@ def api(data: Dict) -> Dict[str, Any]:
         for i, partition in enumerate(partitions):
             sleep(1)
             update_progress(ip, round(30 / (len(partitions) - i), 2))
-            tn = TextNormalizer(partition, query=query)
+            tn = TextNormalizer(partition, query=query, query_similarity_threshold=q_threshold)
             raw_sents.extend(tn.raw_sents)
             sentences.extend(tn.sentences)
             token_count += len(tn.tokens)
@@ -80,7 +80,8 @@ def api(data: Dict) -> Dict[str, Any]:
         "style": dashboard_style,
         "partitions": partitions,
         "neu_threshold": neu_threshold,
-        "ip": ip
+        "ip": ip,
+        "q_t": q_threshold
     }
 
     samuel_data = dict()
@@ -127,7 +128,7 @@ def get_traceback(f):
 @get_traceback
 def api_processor(func_id: int, options: Dict[str, Any]) -> Dict[str, Any]:
     if func_id == 0:
-        return exec_sentiment_classifier(options["query"], options["partitions"], options["neu_threshold"])
+        return exec_sentiment_classifier(options["query"], options["q_t"], options["partitions"], options["neu_threshold"])
     if func_id == 1:
         return exec_topic_modeller(options["sents"], options["visualize"], options["style"])
     if func_id == 2:
@@ -135,11 +136,12 @@ def api_processor(func_id: int, options: Dict[str, Any]) -> Dict[str, Any]:
                                options["query"])
 
 
-def exec_sentiment_classifier(query: str, partitions: List[str], neu_threshold: float) -> Dict[str, Any]:
+def exec_sentiment_classifier(query: str, q_t: float, partitions: List[str], neu_threshold: float) -> Dict[str, Any]:
     _sentences = list()
     _raw_sents = list()
     for partition in partitions:
-        tn = TextNormalizer(partition, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char}, query=query)
+        tn = TextNormalizer(partition, {Property.Letter_Case, Property.Stop_Word, Property.Special_Char}, query=query,
+                    query_similarity_threshold = q_t)
         _sentences.extend(tn.sentences)
         _raw_sents.extend(tn.raw_sents)
     sents = list(zip(_raw_sents, _sentences))
