@@ -3,6 +3,7 @@ from samuel.translator import Language
 from samuel.summarizer import TextSummarizer
 from samuel.topic_modeller import TextTopicModeller
 from samuel.sentiment_classifier import TextSentimentClassifier
+from samuel.constants.vader import Vader
 from progress import update_progress
 from functools import partial
 from numpy import round
@@ -120,7 +121,8 @@ def exec_sentiment_classifier(query: str, partitions: List[str], neu_threshold: 
         _sentences.extend(tn.sentences)
         _raw_sents.extend(tn.raw_sents)
     sents = list(zip(_raw_sents, _sentences))
-    sentiment_classifier = TextSentimentClassifier(sents, neutrality_threshold=neu_threshold)
+    vader = Vader().lexicon
+    sentiment_classifier = TextSentimentClassifier(sents, neutrality_threshold=neu_threshold, vader=vader)
     return {"total_score": sentiment_classifier.total_score,
             "score": sentiment_classifier.sentiment_scores,
             "descriptors": sentiment_classifier.sentiment_descriptors}

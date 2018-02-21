@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
-import Samuel
+from Samuel import api, init
 import progress as progress
 
 app = Flask(__name__)
@@ -24,7 +24,7 @@ def samuel_api():
         progress.reset_logs(ip)
         data = request.get_json()
         data['ip'] = ip
-        samuel = Samuel.api(data)
+        samuel = api(data)
         progress.reset_logs(ip)
         return jsonify(samuel)
     else:
@@ -33,7 +33,7 @@ def samuel_api():
 
 @app.route('/samuel_init', methods=['GET'])
 def samuel_init():
-    return jsonify(Samuel.init(request.args.get('KEY')))
+    return jsonify(init(request.args.get('KEY')))
 
 
 @app.route('/samuel_validate', methods=['GET', 'POST'])
